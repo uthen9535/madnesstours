@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum PostCategory {
+  BTC
+  CYBERPUNK
+  TRAVEL
+  WILD_TOPICS
+}
+
+model User {
+  id           Int        @id @default(autoincrement())
+  username     String     @unique
+  passwordHash String
+  role         Role       @default(MEMBER)
+  displayName  String
+  bio          String?
+  badges       UserBadge[]
+  posts        Post[]
+  mediaItems   MediaItem[]
+  guestbook    GuestbookEntry[] @relation("GuestbookAuthor")
+  createdAt    DateTime   @default(now())
+}
+
+model Post {
+  id         Int          @id @default(autoincrement())
+  slug       String       @unique
+  title      String
+  content    String
+  category   PostCategory
+  published  Boolean      @default(false)
+  authorId   Int
+  author     User         @relation(fields: [authorId], references: [id])
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Trip {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique
+  title       String
+  destination String
+  summary     String
+  story       String
+  stamp       String
+  badgeName   String
+  createdAt   DateTime @default(now())
+}
+
+model GuestbookEntry {
+  id         Int      @id @default(autoincrement())
+  message    String
+  approved   Boolean  @default(false)
+  authorId   Int?
+  author     User?    @relation("GuestbookAuthor", fields: [authorId], references: [id])
+  guestName  String
+  createdAt  DateTime @default(now())
+}
+
+model MediaItem {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  url         String
+  uploadedBy  Int
+  uploader    User     @relation(fields: [uploadedBy], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+model Badge {
+  id    Int       @id @default(autoincrement())
+  name  String    @unique
+  icon  String
+  users UserBadge[]
+}
+
+model UserBadge {
+  userId   Int
+  badgeId  Int
+  earnedAt DateTime @default(now())
+  user     User     @relation(fields: [userId], references: [id])
+  badge    Badge    @relation(fields: [badgeId], references: [id])
+
+  @@id([userId, badgeId])
+}

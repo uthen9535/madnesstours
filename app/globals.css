@@ -1,0 +1,17 @@
+:root { --bg:#120b1f; --panel:#1f1632; --neon:#00f7ff; --pink:#ff3dc1; --text:#c8ffcf; }
+*{box-sizing:border-box}
+body{margin:0;font-family:'Courier New',monospace;color:var(--text);background:repeating-linear-gradient(45deg,#170f2d 0 20px,#21123f 20px 40px);}
+a{color:var(--neon)}
+.app-shell{min-height:100vh;padding:12px}
+.nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.retro-window{border:3px solid #8f6cff;background:var(--panel);padding:12px;box-shadow:0 0 0 3px #2c1e4f inset,0 0 12px #00f7ff55;margin-bottom:12px}
+.neon-btn{background:#220d35;border:2px solid var(--neon);color:var(--neon);padding:8px 10px;cursor:pointer;text-transform:uppercase}
+.terminal{background:black;color:#4cff4c;padding:10px;border:1px dashed #4cff4c;white-space:pre-wrap}
+.badge{display:inline-block;padding:6px 8px;border:2px dotted #ffd95d;background:#3f2d00;color:#ffd95d;margin:4px}
+.marquee{background:#000;padding:8px;border-top:2px solid var(--pink);border-bottom:2px solid var(--pink);margin-bottom:12px}
+.blink{animation:blink 1s steps(2,start) infinite;color:#ff5252}
+@keyframes blink{to{visibility:hidden}}
+.scanlines::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(transparent,transparent 2px,#00000030 3px,#00000055 4px);pointer-events:none}
+input,textarea,select{width:100%;padding:8px;background:#2a2143;color:#fff;border:1px solid #7d68ae;margin:4px 0 8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+@media (max-width:700px){.app-shell{padding:8px}}
