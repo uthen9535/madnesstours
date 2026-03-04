@@ -28,6 +28,14 @@ function invalidCredentialsResponse(request: Request, json: boolean) {
   return NextResponse.redirect(new URL("/login?error=Invalid+credentials", request.url));
 }
 
+function serviceUnavailableResponse(request: Request, json: boolean) {
+  if (json) {
+    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+  }
+
+  return NextResponse.redirect(new URL("/login?error=Service+temporarily+unavailable", request.url));
+}
+
 async function parseLoginRequest(request: Request) {
   const json = isJsonRequest(request);
 
@@ -77,15 +85,27 @@ export async function POST(request: Request) {
     return invalidCredentialsResponse(request, parsedRequest.json);
   }
 
-  const user = await prisma.user.findUnique({
-    where: { username: parsed.data.username }
-  });
+  let user;
+
+  try {
+    user = await prisma.user.findUnique({
+      where: { username: parsed.data.username }
+    });
+  } catch (error) {
+    console.error("Login user lookup failed.", error);
+    return serviceUnavailableResponse(request, parsedRequest.json);
+  }
 
   if (!user) {
     return invalidCredentialsResponse(request, parsedRequest.json);
   }
 
-  await createSession(user.id);
+  try {
+    await createSession(user.id);
+  } catch (error) {
+    console.error("Login session creation failed.", error);
+    return serviceUnavailableResponse(request, parsedRequest.json);
+  }
 
   if (parsedRequest.json) {
     return NextResponse.json({ ok: true, redirectTo: "/home" });
