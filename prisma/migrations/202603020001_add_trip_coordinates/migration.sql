@@ -1,0 +1,2 @@
+ALTER TABLE "Trip" ADD COLUMN "latitude" REAL;
+ALTER TABLE "Trip" ADD COLUMN "longitude" REAL;

@@ -1,0 +1,177 @@
+import { UserStatus } from "@prisma/client";
+import { revalidatePath } from "next/cache";
+import { ChatAutoRefresh } from "@/components/ChatAutoRefresh";
+import { NeonButton } from "@/components/NeonButton";
+import { ProfileLink } from "@/components/ProfileLink";
+import { RetroWindow } from "@/components/RetroWindow";
+import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { formatBtcUnitsFromSats } from "@/lib/satoshi";
+
+const WIRED_WINDOW_MS = 60_000;
+
+function toStatusLabel(status: UserStatus): string {
+  switch (status) {
+    case UserStatus.ALIVE:
+      return "alive";
+    case UserStatus.COMPROMISED:
+      return "compromised";
+    case UserStatus.ELIMINATED:
+      return "eliminated";
+    default:
+      return "alive";
+  }
+}
+
+async function updateOwnStatus(formData: FormData) {
+  "use server";
+
+  const user = await requireUser();
+  const nextStatus = String(formData.get("status") ?? "").trim();
+
+  if (!Object.values(UserStatus).includes(nextStatus as UserStatus)) {
+    return;
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { status: nextStatus as UserStatus }
+  });
+
+  revalidatePath("/guestbook");
+}
+
+async function updateOwnOperations(formData: FormData) {
+  "use server";
+
+  const user = await requireUser();
+  const operations = String(formData.get("operations") ?? "").trim().slice(0, 120);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { operations }
+  });
+
+  revalidatePath("/guestbook");
+}
+
+export default async function GuestbookPage() {
+  const user = await requireUser();
+
+  const [members, attendedTrips, stamps] = await Promise.all([
+    prisma.user.findMany({
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        username: true,
+        status: true,
+        operations: true,
+        btcSats: true,
+        lastSeenAt: true
+      }
+    }),
+    prisma.guestbookEntry.findMany({
+      where: { tripId: { not: null } },
+      select: {
+        userId: true,
+        tripId: true
+      },
+      distinct: ["userId", "tripId"]
+    }),
+    prisma.tripStamp.groupBy({
+      by: ["userId"],
+      _count: { _all: true }
+    })
+  ]);
+
+  const nowMs = Date.now();
+  const punchesByUserId = new Map<string, number>();
+  for (const entry of attendedTrips) {
+    punchesByUserId.set(entry.userId, (punchesByUserId.get(entry.userId) ?? 0) + 1);
+  }
+  const stampsByUserId = new Map(stamps.map((entry) => [entry.userId, entry._count._all]));
+
+  return (
+    <div className="stack">
+      <ChatAutoRefresh intervalMs={5000} />
+      <RetroWindow title="Guestbook: Operator Database">
+        <p className="meta">Columns are live-refreshed every 5 seconds. Wired = wilco when operator is currently online.</p>
+        <div className="database-table-wrap">
+          <table className="database-table">
+            <thead>
+              <tr>
+                <th>codename</th>
+                <th>punches</th>
+                <th>stamps</th>
+                <th>operations</th>
+                <th>purse</th>
+                <th>wired</th>
+                <th>status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {members.map((member) => {
+                const wired =
+                  member.lastSeenAt && nowMs - member.lastSeenAt.getTime() <= WIRED_WINDOW_MS ? "wilco" : "negative";
+
+                return (
+                  <tr key={member.id}>
+                    <td>
+                      <ProfileLink username={member.username} />
+                    </td>
+                    <td>{punchesByUserId.get(member.id) ?? 0}</td>
+                    <td>{stampsByUserId.get(member.id) ?? 0}</td>
+                    <td>
+                      {member.id === user.id ? (
+                        <form action={updateOwnOperations} className="operations-inline-form">
+                          <input
+                            name="operations"
+                            defaultValue={member.operations}
+                            maxLength={120}
+                            placeholder="Set your operations note"
+                          />
+                          <NeonButton type="submit" className="operations-inline-form__button">
+                            Save
+                          </NeonButton>
+                        </form>
+                      ) : (
+                        member.operations
+                      )}
+                    </td>
+                    <td>{formatBtcUnitsFromSats(member.btcSats)} BTC</td>
+                    <td>
+                      {wired === "wilco" ? (
+                        <span className="wired-status">
+                          <span className="wired-status__dot" aria-hidden />
+                          wilco
+                        </span>
+                      ) : (
+                        "negative"
+                      )}
+                    </td>
+                    <td>
+                      {member.id === user.id ? (
+                        <form action={updateOwnStatus} className="status-inline-form">
+                          <select name="status" defaultValue={member.status}>
+                            <option value={UserStatus.ALIVE}>alive</option>
+                            <option value={UserStatus.COMPROMISED}>compromised</option>
+                            <option value={UserStatus.ELIMINATED}>eliminated</option>
+                          </select>
+                          <NeonButton type="submit" className="status-inline-form__button">
+                            Save
+                          </NeonButton>
+                        </form>
+                      ) : (
+                        toStatusLabel(member.status)
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </RetroWindow>
+    </div>
+  );
+}

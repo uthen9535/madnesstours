@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  civilian
+}
+
+enum UserStatus {
+  ALIVE
+  COMPROMISED
+  ELIMINATED
+}
+
+enum BlogCategory {
+  BTC
+  CYBERPUNK
+  TRAVEL
+  WILD_TOPICS
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  AUDIO
+  OTHER
+}
+
+enum TripMissionStatus {
+  MISSION_COMPLETE
+  MISSION_OBJECTIVE
+}
+
+model User {
+  id             String           @id @default(cuid())
+  username       String           @unique
+  passwordHash   String
+  role           Role             @default(civilian)
+  status         UserStatus       @default(ALIVE)
+  operations     String           @default("")
+  displayName    String
+  bio            String?
+  btcSats        Int              @default(100000000)
+  lastSeenAt     DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  sessions       Session[]
+  posts          BlogPost[]
+  tripsLogged    TripStamp[]
+  mediaItems     MediaItem[]      @relation("MediaUploads")
+  mediaApprovals MediaItem[]      @relation("MediaApprovals")
+  guestbook      GuestbookEntry[] @relation("GuestbookAuthor")
+  satsSent       SatoshiDrop[]    @relation("SatoshiDropSender")
+  satsReceived   SatoshiDrop[]    @relation("SatoshiDropReceiver")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model BlogPost {
+  id        String       @id @default(cuid())
+  slug      String       @unique
+  title     String
+  excerpt   String?
+  content   String
+  category  BlogCategory
+  published Boolean      @default(false)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  authorId  String
+  author    User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+model Trip {
+  id            String            @id @default(cuid())
+  slug          String            @unique
+  title         String
+  location      String
+  summary       String
+  content       String
+  startDate     DateTime
+  endDate       DateTime
+  mapX          Int
+  mapY          Int
+  latitude      Float?
+  longitude     Float?
+  missionStatus TripMissionStatus @default(MISSION_COMPLETE)
+  badgeName     String
+  stampLabel    String
+  published     Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  stamps        TripStamp[]
+  guestbook     GuestbookEntry[]
+  mediaItems    MediaItem[]
+}
+
+model TripStamp {
+  id         String   @id @default(cuid())
+  userId     String
+  tripId     String
+  unlockedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trip       Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tripId])
+  @@index([tripId])
+}
+
+model GuestbookEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  tripId    String?
+  message   String
+  createdAt DateTime @default(now())
+  user      User     @relation("GuestbookAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  trip      Trip?    @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  satoshiDrop SatoshiDrop?
+
+  @@index([createdAt])
+  @@index([tripId])
+}
+
+model SatoshiDrop {
+  id         String         @id @default(cuid())
+  senderId   String
+  receiverId String?
+  messageId  String         @unique
+  amountSats Int
+  createdAt  DateTime       @default(now())
+  claimedAt  DateTime?
+  sender     User           @relation("SatoshiDropSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User?          @relation("SatoshiDropReceiver", fields: [receiverId], references: [id], onDelete: SetNull)
+  message    GuestbookEntry @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+model MediaItem {
+  id           String    @id @default(cuid())
+  title        String
+  description  String?
+  url          String
+  type         MediaType @default(IMAGE)
+  approved     Boolean   @default(true)
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  tripId       String?
+  uploadedById String
+  approvedById String?
+  trip         Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  uploadedBy   User      @relation("MediaUploads", fields: [uploadedById], references: [id], onDelete: Cascade)
+  approvedBy   User?     @relation("MediaApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@index([tripId])
+  @@index([approved])
+  @@index([tripId, approved])
+}
+
+model HitCounter {
+  id        Int      @id
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+}

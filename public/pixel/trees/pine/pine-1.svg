@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="152" viewBox="0 0 96 152" shape-rendering="crispEdges">
+  <rect width="96" height="152" fill="none"/>
+  <path d="M46 128h6v18h-6z" fill="#0a1a2b"/>
+  <path d="M45 130h2v16h-2M51 130h2v16h-2" fill="#1f4f63"/>
+  <path d="M46 116h4v6h-4zM44 108h8v7h-8zM42 100h12v8h-12zM40 90h16v9H40zM37 78h22v10H37zM34 64h28v11H34zM30 48h36v12H30zM36 34h24v10H36zM42 22h12v8H42z" fill="#08354b"/>
+  <path d="M44 108h2v7h-2M50 108h2v7h-2M40 90h2v8h-2M54 90h2v8h-2M34 64h2v10h-2M60 64h2v10h-2M42 22h2v8h-2" fill="#58afbf"/>
+  <path d="M38 100h2v2h-2M56 100h2v2h-2M33 78h2v2h-2M61 78h2v2h-2M30 48h2v2h-2M64 48h2v2h-2" fill="#2d6f86"/>
+</svg>
