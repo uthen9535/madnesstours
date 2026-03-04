@@ -1,14 +1,15 @@
-import { UserStatus } from "@prisma/client";
+import { Role, UserStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { ChatAutoRefresh } from "@/components/ChatAutoRefresh";
+import { GuestbookPinControl } from "@/components/GuestbookPinControl";
 import { NeonButton } from "@/components/NeonButton";
 import { ProfileLink } from "@/components/ProfileLink";
 import { RetroWindow } from "@/components/RetroWindow";
 import { requireUser } from "@/lib/auth";
+import { formatEthUnitsFromBase } from "@/lib/ethPurse";
+import { WIRED_WINDOW_MS } from "@/lib/operatorDashboard";
 import { prisma } from "@/lib/prisma";
 import { formatBtcUnitsFromSats } from "@/lib/satoshi";
-
-const WIRED_WINDOW_MS = 60_000;
 
 function toStatusLabel(status: UserStatus): string {
   switch (status) {
@@ -57,19 +58,38 @@ async function updateOwnOperations(formData: FormData) {
 
 export default async function GuestbookPage() {
   const user = await requireUser();
+  const isAdmin = user.role === Role.admin;
 
-  const [members, attendedTrips, stamps] = await Promise.all([
-    prisma.user.findMany({
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        username: true,
-        status: true,
-        operations: true,
-        btcSats: true,
-        lastSeenAt: true
-      }
-    }),
+  const [members, attendedTrips, stamps, ownPinRecord] = await Promise.all([
+    isAdmin
+      ? prisma.user.findMany({
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            username: true,
+            role: true,
+            status: true,
+            operations: true,
+            btcSats: true,
+            ethUnits: true,
+            lastSeenAt: true,
+            pin: true,
+            pinResetComplete: true
+          }
+        })
+      : prisma.user.findMany({
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            username: true,
+            status: true,
+            operations: true,
+            btcSats: true,
+            ethUnits: true,
+            lastSeenAt: true,
+            pinResetComplete: true
+          }
+        }),
     prisma.guestbookEntry.findMany({
       where: { tripId: { not: null } },
       select: {
@@ -81,7 +101,13 @@ export default async function GuestbookPage() {
     prisma.tripStamp.groupBy({
       by: ["userId"],
       _count: { _all: true }
-    })
+    }),
+    isAdmin
+      ? Promise.resolve(null)
+      : prisma.user.findUnique({
+          where: { id: user.id },
+          select: { pin: true }
+        })
   ]);
 
   const nowMs = Date.now();
@@ -93,24 +119,26 @@ export default async function GuestbookPage() {
 
   return (
     <div className="stack">
-      <ChatAutoRefresh intervalMs={5000} />
-      <RetroWindow title="Guestbook: Operator Database">
+      <ChatAutoRefresh intervalMs={5000} pauseWhileTypingSelector=".guestbook-pin-manager" />
+      <RetroWindow title="Guestbook: Member Database">
         <p className="meta">Columns are live-refreshed every 5 seconds. Wired = wilco when operator is currently online.</p>
         <div className="database-table-wrap">
           <table className="database-table">
             <thead>
               <tr>
-                <th>codename</th>
+                <th>members</th>
                 <th>punches</th>
                 <th>stamps</th>
                 <th>operations</th>
                 <th>purse</th>
                 <th>wired</th>
-                <th>status</th>
+                <th>agent condition</th>
+                <th className={isAdmin ? "database-table__pin-header" : undefined}>pin</th>
               </tr>
             </thead>
             <tbody>
               {members.map((member) => {
+                const adminMember = member as typeof member & { pin?: string; pinResetComplete?: boolean };
                 const wired =
                   member.lastSeenAt && nowMs - member.lastSeenAt.getTime() <= WIRED_WINDOW_MS ? "wilco" : "negative";
 
@@ -138,7 +166,9 @@ export default async function GuestbookPage() {
                         member.operations
                       )}
                     </td>
-                    <td>{formatBtcUnitsFromSats(member.btcSats)} BTC</td>
+                    <td>
+                      {formatBtcUnitsFromSats(member.btcSats)} BTC // {formatEthUnitsFromBase(member.ethUnits)} ETH
+                    </td>
                     <td>
                       {wired === "wilco" ? (
                         <span className="wired-status">
@@ -164,6 +194,24 @@ export default async function GuestbookPage() {
                       ) : (
                         toStatusLabel(member.status)
                       )}
+                    </td>
+                    <td className={isAdmin ? "database-table__pin-cell" : undefined}>
+                      <GuestbookPinControl
+                        memberId={member.id}
+                        memberUsername={member.username}
+                        canEdit={isAdmin || member.id === user.id}
+                        displayValue={
+                          isAdmin
+                            ? member.id === user.id
+                              ? adminMember.pin ?? "******"
+                              : adminMember.pinResetComplete
+                              ? "******"
+                              : adminMember.pin ?? "******"
+                            : member.id === user.id
+                            ? ownPinRecord?.pin ?? "******"
+                            : "******"
+                        }
+                      />
                     </td>
                   </tr>
                 );

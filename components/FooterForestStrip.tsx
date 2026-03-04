@@ -16,7 +16,10 @@ export function FooterForestStrip() {
         aria-label="Deep Chats preview"
       />
       <div className="footer-forest-strip__shade" />
-      <div className="footer-forest-strip__cta-wrap">
+      <div
+        className="footer-forest-strip__cta-wrap footer-forest-strip__cta-wrap--always-visible"
+        style={{ opacity: 1, pointerEvents: "auto" }}
+      >
         <Link href="/deep-chats" className="footer-forest-strip__cta">
           Enter Deep Chats
         </Link>

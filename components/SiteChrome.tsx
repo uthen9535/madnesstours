@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { DeepChatsGatekeeper } from "@/components/DeepChatsGatekeeper";
 import { MarqueeBanner } from "@/components/MarqueeBanner";
 import { NeonButton } from "@/components/NeonButton";
-import { SystemAttackFeed } from "@/components/SystemAttackFeed";
 
 type SiteChromeProps = {
   username: string;
@@ -29,7 +28,8 @@ const links = [
   { href: "/deep-chats", label: "Deep Chats" },
   { href: "/vault", label: "Vault" },
   { href: "/guestbook", label: "Guestbook" },
-  { href: "/admin", label: "Admin" }
+  { href: "/admin", label: "Admin", command: true },
+  { href: "/staging", label: "Testing", command: true }
 ];
 
 export function SiteChrome({ username, role, hitCount, btc, children }: SiteChromeProps) {
@@ -150,15 +150,23 @@ export function SiteChrome({ username, role, hitCount, btc, children }: SiteChro
       <nav className="shell-nav" aria-label="Main navigation">
         {links.map((link) => {
           const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
-          if (link.href === "/admin" && role !== "admin") {
+          if ((link.href === "/admin" || link.href === "/staging") && role !== "admin") {
             return null;
+          }
+
+          const classes = ["shell-nav__link"];
+          if (link.command) {
+            classes.push("shell-nav__link--command");
+          }
+          if (active) {
+            classes.push("shell-nav__link--active");
           }
 
           return (
             <Link
               key={link.href}
               href={link.href}
-              className={active ? "shell-nav__link shell-nav__link--active" : "shell-nav__link"}
+              className={classes.join(" ")}
             >
               {link.label}
             </Link>
@@ -167,7 +175,6 @@ export function SiteChrome({ username, role, hitCount, btc, children }: SiteChro
       </nav>
       <main className="shell-main">{children}</main>
       <DeepChatsGatekeeper />
-      <SystemAttackFeed currentUsername={username} />
     </div>
   );
 }

@@ -14,6 +14,7 @@ type EvidenceProfile = {
   health: number;
   operations: string;
   btcSats: number;
+  ethUnits: number;
   liveChatMessages: number;
   travelStamps: number;
   punches: number;

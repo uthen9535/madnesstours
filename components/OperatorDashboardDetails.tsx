@@ -1,5 +1,6 @@
 import { ProfileLink } from "@/components/ProfileLink";
 import { TerminalBlock } from "@/components/TerminalBlock";
+import { formatEthUnitsFromBase } from "@/lib/ethPurse";
 import { formatBtcUnitsFromSats } from "@/lib/satoshi";
 
 type OperatorDashboardDetailsProps = {
@@ -13,6 +14,7 @@ type OperatorDashboardDetailsProps = {
   punches: number;
   operations: string;
   btcSats: number;
+  ethUnits: number;
 };
 
 export function OperatorDashboardDetails({
@@ -25,7 +27,8 @@ export function OperatorDashboardDetails({
   travelStamps,
   punches,
   operations,
-  btcSats
+  btcSats,
+  ethUnits
 }: OperatorDashboardDetailsProps) {
   return (
     <div className="operator-dashboard-details">
@@ -34,18 +37,29 @@ export function OperatorDashboardDetails({
       </div>
       <p className="meta">health: {health}%</p>
       <TerminalBlock>
-        <div>status: {wired ? "connected" : "offline"}</div>
         <div>role: {role}</div>
         <div>
           codename: <ProfileLink username={username} />
         </div>
         <div>agent condition: {statusLabel}</div>
-        <div>wired: {wired ? "wilco" : "negative"}</div>
+        <div>
+          wired:{" "}
+          {wired ? (
+            <span className="wired-status">
+              <span className="wired-status__dot" aria-hidden />
+              wilco
+            </span>
+          ) : (
+            "negative"
+          )}
+        </div>
         <div>live chat messages: {liveChatMessages}</div>
         <div>travel stamps: {travelStamps}</div>
         <div>punches: {punches}</div>
         <div>operations: {operations || "none logged"}</div>
-        <div>purse: {formatBtcUnitsFromSats(btcSats)} BTC</div>
+        <div>
+          purse: {formatBtcUnitsFromSats(btcSats)} BTC // {formatEthUnitsFromBase(ethUnits)} ETH
+        </div>
       </TerminalBlock>
     </div>
   );

@@ -41,12 +41,15 @@ model User {
   id             String           @id @default(cuid())
   username       String           @unique
   passwordHash   String
+  pin            String           @default("170017")
+  pinResetComplete Boolean        @default(false)
   role           Role             @default(civilian)
   status         UserStatus       @default(ALIVE)
   operations     String           @default("")
   displayName    String
   bio            String?
   btcSats        Int              @default(100000000)
+  ethUnits       Int              @default(100000000)
   lastSeenAt     DateTime?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -58,6 +61,8 @@ model User {
   guestbook      GuestbookEntry[] @relation("GuestbookAuthor")
   satsSent       SatoshiDrop[]    @relation("SatoshiDropSender")
   satsReceived   SatoshiDrop[]    @relation("SatoshiDropReceiver")
+  ethSent        EthDrop[]        @relation("EthDropSender")
+  ethReceived    EthDrop[]        @relation("EthDropReceiver")
 }
 
 model Session {
@@ -130,6 +135,7 @@ model GuestbookEntry {
   user      User     @relation("GuestbookAuthor", fields: [userId], references: [id], onDelete: Cascade)
   trip      Trip?    @relation(fields: [tripId], references: [id], onDelete: Cascade)
   satoshiDrop SatoshiDrop?
+  ethDrop   EthDrop?
 
   @@index([createdAt])
   @@index([tripId])
@@ -146,6 +152,23 @@ model SatoshiDrop {
   sender     User           @relation("SatoshiDropSender", fields: [senderId], references: [id], onDelete: Cascade)
   receiver   User?          @relation("SatoshiDropReceiver", fields: [receiverId], references: [id], onDelete: SetNull)
   message    GuestbookEntry @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+model EthDrop {
+  id          String         @id @default(cuid())
+  senderId    String
+  receiverId  String?
+  messageId   String         @unique
+  amountUnits Int
+  createdAt   DateTime       @default(now())
+  claimedAt   DateTime?
+  sender      User           @relation("EthDropSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User?          @relation("EthDropReceiver", fields: [receiverId], references: [id], onDelete: SetNull)
+  message     GuestbookEntry @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
   @@index([senderId])

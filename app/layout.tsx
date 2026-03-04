@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { GlobalGlitch } from "@/components/GlobalGlitch";
+import { SystemAttackFeed } from "@/components/SystemAttackFeed";
+import { getCurrentUser } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,11 +15,14 @@ export const metadata: Metadata = {
   }
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const currentUser = await getCurrentUser();
+
   return (
     <html lang="en">
       <body>
         {children}
+        <SystemAttackFeed currentUsername={currentUser?.username ?? ""} />
         <GlobalGlitch />
       </body>
     </html>

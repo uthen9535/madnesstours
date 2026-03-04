@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createSession, verifyGlobalPassword } from "@/lib/auth";
+import { createSession, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 const loginSchema = z.object({
   username: z.string().trim().min(1).transform((value) => value.toLowerCase()),
-  password: z.string().min(1)
+  pin: z.string().regex(/^\d{6}$/).optional(),
+  password: z.string().optional()
 });
 
 function isJsonRequest(request: Request) {
@@ -46,6 +47,7 @@ async function parseLoginRequest(request: Request) {
         json,
         values: {
           username: payload?.username,
+          pin: payload?.pin,
           password: payload?.password
         }
       };
@@ -60,6 +62,7 @@ async function parseLoginRequest(request: Request) {
       json,
       values: {
         username: formData.get("username"),
+        pin: formData.get("pin"),
         password: formData.get("password")
       }
     };
@@ -81,10 +84,6 @@ export async function POST(request: Request) {
     return invalidRequestResponse(request, parsedRequest.json);
   }
 
-  if (!verifyGlobalPassword(parsed.data.password)) {
-    return invalidCredentialsResponse(request, parsedRequest.json);
-  }
-
   let user;
 
   try {
@@ -97,6 +96,17 @@ export async function POST(request: Request) {
   }
 
   if (!user) {
+    return invalidCredentialsResponse(request, parsedRequest.json);
+  }
+
+  const suppliedCredential = parsed.data.pin ?? parsed.data.password ?? "";
+  if (!/^\d{6}$/.test(suppliedCredential)) {
+    return invalidCredentialsResponse(request, parsedRequest.json);
+  }
+
+  const credentialIsValid = await verifyPassword(suppliedCredential, user.passwordHash);
+
+  if (!credentialIsValid) {
     return invalidCredentialsResponse(request, parsedRequest.json);
   }
 

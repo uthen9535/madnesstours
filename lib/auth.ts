@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 const COOKIE_NAME = process.env.SESSION_COOKIE_NAME ?? "madnessnet_session";
 const SESSION_MAX_AGE_DAYS = Number(process.env.SESSION_MAX_AGE_DAYS ?? 7);
 const GLOBAL_SITE_PASSWORD = process.env.GLOBAL_SITE_PASSWORD ?? "finnsbeachclub";
+const GLOBAL_SITE_PIN = process.env.GLOBAL_SITE_PIN ?? "170017";
 const SESSION_SECRET = process.env.SESSION_SECRET ?? `${GLOBAL_SITE_PASSWORD}-session-secret`;
 const STATELESS_SESSION_PREFIX = "st";
 
@@ -30,6 +31,14 @@ export function verifyGlobalPassword(password: string): boolean {
 
 export async function hashGlobalPassword(): Promise<string> {
   return hashPassword(GLOBAL_SITE_PASSWORD);
+}
+
+export function verifyGlobalPin(pin: string): boolean {
+  return /^\d{6}$/.test(pin) && pin === GLOBAL_SITE_PIN;
+}
+
+export async function hashGlobalPin(): Promise<string> {
+  return hashPassword(GLOBAL_SITE_PIN);
 }
 
 function hashSessionToken(token: string): string {

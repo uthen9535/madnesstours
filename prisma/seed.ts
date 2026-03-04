@@ -4,8 +4,8 @@ import { PrismaClient, BlogCategory, MediaType, Role, TripMissionStatus } from "
 const prisma = new PrismaClient();
 
 async function main() {
-  const globalSitePassword = process.env.GLOBAL_SITE_PASSWORD ?? "finnsbeachclub";
-  const sharedPasswordHash = await bcrypt.hash(globalSitePassword, 12);
+  const globalSitePin = process.env.GLOBAL_SITE_PIN ?? "170017";
+  const sharedPasswordHash = await bcrypt.hash(globalSitePin, 12);
 
   await prisma.tripStamp.deleteMany();
   await prisma.guestbookEntry.deleteMany();
@@ -19,7 +19,11 @@ async function main() {
   const admin = await prisma.user.create({
     data: {
       username: "sysop",
+      pin: globalSitePin,
       passwordHash: sharedPasswordHash,
+      pinResetComplete: false,
+      btcSats: 100_000_000,
+      ethUnits: 100_000_000,
       role: Role.admin,
       displayName: "SysOp Nova",
       bio: "Keeper of neon tubes, keeper of tours."
@@ -29,7 +33,11 @@ async function main() {
   const member = await prisma.user.create({
     data: {
       username: "traveler",
+      pin: globalSitePin,
       passwordHash: sharedPasswordHash,
+      pinResetComplete: false,
+      btcSats: 100_000_000,
+      ethUnits: 100_000_000,
       role: Role.civilian,
       displayName: "Traveler Byte",
       bio: "Collecting stamps across the pixel globe."
@@ -181,8 +189,8 @@ async function main() {
   });
 
   console.log("Seeded MadnessNet.");
-  console.log(`Admin login: sysop / ${globalSitePassword}`);
-  console.log(`Member login: traveler / ${globalSitePassword}`);
+  console.log(`Admin login: sysop / ${globalSitePin}`);
+  console.log(`Member login: traveler / ${globalSitePin}`);
   console.log(`Trips: ${trip1.slug}, ${trip2.slug}, ${trip3.slug}`);
 }
 

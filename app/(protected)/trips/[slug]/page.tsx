@@ -8,6 +8,7 @@ import { NeonButton } from "@/components/NeonButton";
 import { ProfileLink } from "@/components/ProfileLink";
 import { RetroWindow } from "@/components/RetroWindow";
 import { StampBadge } from "@/components/StampBadge";
+import { TripEditorDrawer } from "@/components/TripEditorDrawer";
 import { TripMediaUploadDropzone } from "@/components/TripMediaUploadDropzone";
 import { requireAdmin, requireUser } from "@/lib/auth";
 import { renderMarkdown } from "@/lib/markdown";
@@ -18,6 +19,10 @@ type TripPageProps = {
 };
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+function toDateInputValue(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
 
 function sanitizeSlug(value: string): string {
   const cleaned = value
@@ -269,6 +274,84 @@ async function updateTripMissionStatus(formData: FormData) {
   revalidatePath(`/trips/${trip.slug}`);
 }
 
+async function updateTripDetails(formData: FormData) {
+  "use server";
+
+  await requireAdmin();
+
+  const tripId = String(formData.get("tripId") ?? "").trim();
+  const currentSlug = String(formData.get("currentSlug") ?? "").trim();
+  const title = String(formData.get("title") ?? "").trim();
+  const location = String(formData.get("location") ?? "").trim();
+  const summary = String(formData.get("summary") ?? "").trim();
+  const content = String(formData.get("content") ?? "").trim();
+  const startDate = String(formData.get("startDate") ?? "").trim();
+  const endDate = String(formData.get("endDate") ?? "").trim();
+  const mapX = Number(formData.get("mapX") ?? 50);
+  const mapY = Number(formData.get("mapY") ?? 50);
+  const latitudeRaw = String(formData.get("latitude") ?? "").trim();
+  const longitudeRaw = String(formData.get("longitude") ?? "").trim();
+  const missionStatus = String(formData.get("missionStatus") ?? TripMissionStatus.MISSION_COMPLETE).trim();
+  const badgeName = String(formData.get("badgeName") ?? "").trim();
+  const stampLabel = String(formData.get("stampLabel") ?? "").trim();
+  const published = formData.get("published") === "on";
+
+  if (!tripId || !title || !location || !summary || !content || !badgeName || !stampLabel) {
+    return;
+  }
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return;
+  }
+
+  const latitude = latitudeRaw ? Number(latitudeRaw) : null;
+  const longitude = longitudeRaw ? Number(longitudeRaw) : null;
+
+  if (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) {
+    return;
+  }
+
+  if (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180)) {
+    return;
+  }
+
+  if (!Object.values(TripMissionStatus).includes(missionStatus as TripMissionStatus)) {
+    return;
+  }
+
+  const trip = await prisma.trip.update({
+    where: { id: tripId },
+    data: {
+      title,
+      location,
+      summary,
+      content,
+      startDate: start,
+      endDate: end,
+      mapX: Number.isFinite(mapX) ? mapX : 50,
+      mapY: Number.isFinite(mapY) ? mapY : 50,
+      latitude,
+      longitude,
+      missionStatus: missionStatus as TripMissionStatus,
+      badgeName,
+      stampLabel,
+      published
+    },
+    select: { slug: true }
+  });
+
+  revalidatePath("/map");
+  revalidatePath("/stamps");
+  revalidatePath("/trips");
+  revalidatePath("/home");
+  revalidatePath(`/trips/${trip.slug}`);
+  if (currentSlug && currentSlug !== trip.slug) {
+    revalidatePath(`/trips/${currentSlug}`);
+  }
+}
+
 export default async function TripPage({ params }: TripPageProps) {
   const { slug } = await params;
   const user = await requireUser();
@@ -340,12 +423,35 @@ export default async function TripPage({ params }: TripPageProps) {
   return (
     <div className="trip-detail-layout">
       <div className="stack">
-        <RetroWindow title={trip.title}>
+        <RetroWindow title={trip.title} className="trip-overview-window">
           <p className="meta">
             {trip.location} :: {trip.startDate.toLocaleDateString()} - {trip.endDate.toLocaleDateString()}
           </p>
           <p>{trip.summary}</p>
           <article className="markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(trip.content) }} />
+          {user.role === "admin" ? (
+            <TripEditorDrawer
+              action={updateTripDetails}
+              trip={{
+                id: trip.id,
+                slug: trip.slug,
+                title: trip.title,
+                location: trip.location,
+                summary: trip.summary,
+                content: trip.content,
+                startDate: toDateInputValue(trip.startDate),
+                endDate: toDateInputValue(trip.endDate),
+                mapX: trip.mapX,
+                mapY: trip.mapY,
+                latitude: trip.latitude,
+                longitude: trip.longitude,
+                missionStatus: trip.missionStatus,
+                badgeName: trip.badgeName,
+                stampLabel: trip.stampLabel,
+                published: trip.published
+              }}
+            />
+          ) : null}
         </RetroWindow>
 
         <RetroWindow title="Trip Guestbook + Stamp Access">

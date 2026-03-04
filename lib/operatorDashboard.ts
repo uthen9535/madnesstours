@@ -1,7 +1,7 @@
 import { UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
-export const WIRED_WINDOW_MS = 60_000;
+export const WIRED_WINDOW_MS = 120_000;
 
 export function getOperatorStatusLabel(status: UserStatus): string {
   switch (status) {
@@ -38,6 +38,7 @@ export type OperatorDashboardData = {
   health: number;
   operations: string;
   btcSats: number;
+  ethUnits: number;
   liveChatMessages: number;
   travelStamps: number;
   punches: number;
@@ -53,6 +54,7 @@ export async function getOperatorDashboardData(userId: string): Promise<Operator
       status: true,
       operations: true,
       btcSats: true,
+      ethUnits: true,
       lastSeenAt: true
     }
   });
@@ -92,6 +94,7 @@ export async function getOperatorDashboardData(userId: string): Promise<Operator
     health: getOperatorHealth(user.status),
     operations: user.operations,
     btcSats: user.btcSats,
+    ethUnits: user.ethUnits,
     liveChatMessages,
     travelStamps,
     punches: punchesDistinctTrips.length

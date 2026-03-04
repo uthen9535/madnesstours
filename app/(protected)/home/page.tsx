@@ -1,21 +1,23 @@
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { BTCSatsChart } from "@/components/BTCSatsChart";
 import { BlinkTag } from "@/components/BlinkTag";
 import { ChatAutoRefresh } from "@/components/ChatAutoRefresh";
+import { ChatThreadViewport } from "@/components/ChatThreadViewport";
 import { FooterForestStrip } from "@/components/FooterForestStrip";
+import { HomeChartsColumn } from "@/components/HomeChartsColumn";
 import { LiveChatComposer } from "@/components/LiveChatComposer";
 import { NeonButton } from "@/components/NeonButton";
 import { OperatorDashboardDetails } from "@/components/OperatorDashboardDetails";
 import { ProfileLink } from "@/components/ProfileLink";
 import { RetroWindow } from "@/components/RetroWindow";
-import { SubmarineCommandChart } from "@/components/SubmarineCommandChart";
 import { requireUser } from "@/lib/auth";
 import { getBTCWeeklySnapshot } from "@/lib/btc";
 import { getETHWeeklySnapshot } from "@/lib/eth";
+import { formatEthUnitsFromBase, parseEthUnitsToBase } from "@/lib/ethPurse";
 import { getOperatorDashboardData } from "@/lib/operatorDashboard";
 import { prisma } from "@/lib/prisma";
 import { formatBtcUnitsFromSats, parseBtcUnitsToSats } from "@/lib/satoshi";
+import { withSqliteRetry } from "@/lib/sqliteRetry";
 
 async function sendHomeChatMessage(formData: FormData) {
   "use server";
@@ -24,7 +26,7 @@ async function sendHomeChatMessage(formData: FormData) {
   const intent = String(formData.get("intent") ?? "message").trim();
 
   if (intent === "satoshi") {
-    const recipientRaw = String(formData.get("satoshiRecipient") ?? "").trim();
+    const recipientRaw = String(formData.get("dropRecipient") ?? "").trim();
     const recipientUsername = recipientRaw.replace(/^@+/, "").toLowerCase();
     if (!recipientUsername) {
       return;
@@ -36,65 +38,145 @@ async function sendHomeChatMessage(formData: FormData) {
       return;
     }
 
-    await prisma.$transaction(async (tx) => {
-      const sender = await tx.user.findUnique({
-        where: { id: user.id },
-        select: { btcSats: true }
-      });
+    try {
+      await withSqliteRetry(() =>
+        prisma.$transaction(async (tx) => {
+          const sender = await tx.user.findUnique({
+            where: { id: user.id },
+            select: { btcSats: true }
+          });
 
-      if (!sender || sender.btcSats < amountSats) {
-        return;
-      }
-
-      const recipient = await tx.user.findUnique({
-        where: { username: recipientUsername },
-        select: { id: true, username: true }
-      });
-
-      if (!recipient || recipient.id === user.id) {
-        return;
-      }
-
-      await tx.user.update({
-        where: { id: user.id },
-        data: {
-          btcSats: {
-            decrement: amountSats
+          if (!sender || sender.btcSats < amountSats) {
+            return;
           }
-        }
-      });
 
-      const message = `SATOSHI DROP // ${formatBtcUnitsFromSats(amountSats)} BTC (${amountSats.toLocaleString()} sats) // target @${recipient.username}`;
-      const entry = await tx.guestbookEntry.create({
-        data: {
-          userId: user.id,
-          tripId: null,
-          message
-        }
-      });
+          const recipient = await tx.user.findUnique({
+            where: { username: recipientUsername },
+            select: { id: true, username: true }
+          });
 
-      await tx.satoshiDrop.create({
-        data: {
-          senderId: user.id,
-          receiverId: recipient.id,
-          messageId: entry.id,
-          amountSats
-        }
-      });
-    });
+          if (!recipient || recipient.id === user.id) {
+            return;
+          }
+
+          await tx.user.update({
+            where: { id: user.id },
+            data: {
+              btcSats: {
+                decrement: amountSats
+              }
+            }
+          });
+
+          const message = `SATOSHI DROP // ${formatBtcUnitsFromSats(amountSats)} BTC (${amountSats.toLocaleString()} sats) // target @${recipient.username}`;
+          const entry = await tx.guestbookEntry.create({
+            data: {
+              userId: user.id,
+              tripId: null,
+              message
+            }
+          });
+
+          await tx.satoshiDrop.create({
+            data: {
+              senderId: user.id,
+              receiverId: recipient.id,
+              messageId: entry.id,
+              amountSats
+            }
+          });
+        })
+      );
+    } catch (error) {
+      console.error("chat transmission satoshi send failed", error);
+      return;
+    }
+  } else if (intent === "ethereum") {
+    const recipientRaw = String(formData.get("dropRecipient") ?? "").trim();
+    const recipientUsername = recipientRaw.replace(/^@+/, "").toLowerCase();
+    if (!recipientUsername) {
+      return;
+    }
+
+    const unitsRaw = String(formData.get("ethereumUnits") ?? "").trim();
+    const amountUnits = parseEthUnitsToBase(unitsRaw);
+    if (!amountUnits) {
+      return;
+    }
+
+    try {
+      await withSqliteRetry(() =>
+        prisma.$transaction(async (tx) => {
+          const sender = await tx.user.findUnique({
+            where: { id: user.id },
+            select: { ethUnits: true }
+          });
+
+          if (!sender || sender.ethUnits < amountUnits) {
+            return;
+          }
+
+          const recipient = await tx.user.findUnique({
+            where: { username: recipientUsername },
+            select: { id: true, username: true }
+          });
+
+          if (!recipient || recipient.id === user.id) {
+            return;
+          }
+
+          await tx.user.update({
+            where: { id: user.id },
+            data: {
+              ethUnits: {
+                decrement: amountUnits
+              }
+            }
+          });
+
+          const message = `ETHEREUM DROP // ${formatEthUnitsFromBase(amountUnits)} ETH (${amountUnits.toLocaleString()} units) // target @${recipient.username}`;
+          const entry = await tx.guestbookEntry.create({
+            data: {
+              userId: user.id,
+              tripId: null,
+              message
+            }
+          });
+
+          await tx.ethDrop.create({
+            data: {
+              senderId: user.id,
+              receiverId: recipient.id,
+              messageId: entry.id,
+              amountUnits
+            }
+          });
+        })
+      );
+    } catch (error) {
+      console.error("chat transmission ethereum send failed", error);
+      return;
+    }
   } else {
     const message = String(formData.get("message") ?? "").trim();
     if (!message || message.length > 500) {
       return;
     }
 
-    await prisma.guestbookEntry.create({
-      data: {
-        userId: user.id,
-        tripId: null,
-        message
-      }
-    });
+    try {
+      await withSqliteRetry(() =>
+        prisma.guestbookEntry.create({
+          data: {
+            userId: user.id,
+            tripId: null,
+            message
+          }
+        })
+      );
+    } catch (error) {
+      console.error("chat transmission message send failed", error);
+      return;
+    }
   }
 
   revalidatePath("/guestbook");
@@ -110,49 +192,56 @@ async function acceptSatoshiDropFromHome(formData: FormData) {
     return;
   }
 
-  await prisma.$transaction(async (tx) => {
-    const drop = await tx.satoshiDrop.findUnique({
-      where: { id: dropId },
-      select: {
-        amountSats: true,
-        senderId: true,
-        receiverId: true,
-        claimedAt: true
-      }
-    });
+  try {
+    await withSqliteRetry(() =>
+      prisma.$transaction(async (tx) => {
+        const drop = await tx.satoshiDrop.findUnique({
+          where: { id: dropId },
+          select: {
+            amountSats: true,
+            senderId: true,
+            receiverId: true,
+            claimedAt: true
+          }
+        });
 
-    if (!drop || drop.senderId === user.id || drop.claimedAt) {
-      return;
-    }
-
-    if (drop.receiverId && drop.receiverId !== user.id) {
-      return;
-    }
-
-    const claimed = await tx.satoshiDrop.updateMany({
-      where: {
-        id: dropId,
-        claimedAt: null
-      },
-      data: {
-        receiverId: user.id,
-        claimedAt: new Date()
-      }
-    });
-
-    if (claimed.count === 0) {
-      return;
-    }
-
-    await tx.user.update({
-      where: { id: user.id },
-      data: {
-        btcSats: {
-          increment: drop.amountSats
+        if (!drop || drop.senderId === user.id || drop.claimedAt) {
+          return;
         }
-      }
-    });
-  });
+
+        if (drop.receiverId && drop.receiverId !== user.id) {
+          return;
+        }
+
+        const claimed = await tx.satoshiDrop.updateMany({
+          where: {
+            id: dropId,
+            claimedAt: null
+          },
+          data: {
+            receiverId: user.id,
+            claimedAt: new Date()
+          }
+        });
+
+        if (claimed.count === 0) {
+          return;
+        }
+
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            btcSats: {
+              increment: drop.amountSats
+            }
+          }
+        });
+      })
+    );
+  } catch (error) {
+    console.error("chat transmission satoshi accept failed", error);
+    return;
+  }
 
   revalidatePath("/guestbook");
   revalidatePath("/home");
@@ -167,49 +256,184 @@ async function abortSatoshiDropFromHome(formData: FormData) {
     return;
   }
 
-  await prisma.$transaction(async (tx) => {
-    const drop = await tx.satoshiDrop.findUnique({
-      where: { id: dropId },
-      select: {
-        id: true,
-        messageId: true,
-        amountSats: true,
-        senderId: true,
-        claimedAt: true
-      }
-    });
+  try {
+    await withSqliteRetry(() =>
+      prisma.$transaction(async (tx) => {
+        const drop = await tx.satoshiDrop.findUnique({
+          where: { id: dropId },
+          select: {
+            id: true,
+            messageId: true,
+            amountSats: true,
+            senderId: true,
+            claimedAt: true
+          }
+        });
 
-    if (!drop || drop.senderId !== user.id || drop.claimedAt) {
-      return;
-    }
-
-    const deleted = await tx.satoshiDrop.deleteMany({
-      where: {
-        id: drop.id,
-        senderId: user.id,
-        claimedAt: null
-      }
-    });
-
-    if (deleted.count === 0) {
-      return;
-    }
-
-    await tx.user.update({
-      where: { id: user.id },
-      data: {
-        btcSats: {
-          increment: drop.amountSats
+        if (!drop || drop.senderId !== user.id || drop.claimedAt) {
+          return;
         }
-      }
-    });
 
-    await tx.guestbookEntry.deleteMany({
-      where: {
-        id: drop.messageId
-      }
-    });
-  });
+        const deleted = await tx.satoshiDrop.deleteMany({
+          where: {
+            id: drop.id,
+            senderId: user.id,
+            claimedAt: null
+          }
+        });
+
+        if (deleted.count === 0) {
+          return;
+        }
+
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            btcSats: {
+              increment: drop.amountSats
+            }
+          }
+        });
+
+        await tx.guestbookEntry.deleteMany({
+          where: {
+            id: drop.messageId
+          }
+        });
+      })
+    );
+  } catch (error) {
+    console.error("chat transmission satoshi abort failed", error);
+    return;
+  }
+
+  revalidatePath("/guestbook");
+  revalidatePath("/home");
+}
+
+async function acceptEthereumDropFromHome(formData: FormData) {
+  "use server";
+
+  const user = await requireUser();
+  const dropId = String(formData.get("dropId") ?? "").trim();
+  if (!dropId) {
+    return;
+  }
+
+  try {
+    await withSqliteRetry(() =>
+      prisma.$transaction(async (tx) => {
+        const drop = await tx.ethDrop.findUnique({
+          where: { id: dropId },
+          select: {
+            amountUnits: true,
+            senderId: true,
+            receiverId: true,
+            claimedAt: true
+          }
+        });
+
+        if (!drop || drop.senderId === user.id || drop.claimedAt) {
+          return;
+        }
+
+        if (drop.receiverId && drop.receiverId !== user.id) {
+          return;
+        }
+
+        const claimed = await tx.ethDrop.updateMany({
+          where: {
+            id: dropId,
+            claimedAt: null
+          },
+          data: {
+            receiverId: user.id,
+            claimedAt: new Date()
+          }
+        });
+
+        if (claimed.count === 0) {
+          return;
+        }
+
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            ethUnits: {
+              increment: drop.amountUnits
+            }
+          }
+        });
+      })
+    );
+  } catch (error) {
+    console.error("chat transmission ethereum accept failed", error);
+    return;
+  }
+
+  revalidatePath("/guestbook");
+  revalidatePath("/home");
+}
+
+async function abortEthereumDropFromHome(formData: FormData) {
+  "use server";
+
+  const user = await requireUser();
+  const dropId = String(formData.get("dropId") ?? "").trim();
+  if (!dropId) {
+    return;
+  }
+
+  try {
+    await withSqliteRetry(() =>
+      prisma.$transaction(async (tx) => {
+        const drop = await tx.ethDrop.findUnique({
+          where: { id: dropId },
+          select: {
+            id: true,
+            messageId: true,
+            amountUnits: true,
+            senderId: true,
+            claimedAt: true
+          }
+        });
+
+        if (!drop || drop.senderId !== user.id || drop.claimedAt) {
+          return;
+        }
+
+        const deleted = await tx.ethDrop.deleteMany({
+          where: {
+            id: drop.id,
+            senderId: user.id,
+            claimedAt: null
+          }
+        });
+
+        if (deleted.count === 0) {
+          return;
+        }
+
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            ethUnits: {
+              increment: drop.amountUnits
+            }
+          }
+        });
+
+        await tx.guestbookEntry.deleteMany({
+          where: {
+            id: drop.messageId
+          }
+        });
+      })
+    );
+  } catch (error) {
+    console.error("chat transmission ethereum abort failed", error);
+    return;
+  }
 
   revalidatePath("/guestbook");
   revalidatePath("/home");
@@ -230,7 +454,8 @@ export default async function HomePage() {
     prisma.$transaction([
       prisma.user.count(),
       prisma.trip.count({ where: { published: true } }),
-      prisma.satoshiDrop.count()
+      prisma.satoshiDrop.count(),
+      prisma.ethDrop.count()
     ]),
     prisma.guestbookEntry.findMany({
       where: { tripId: null },
@@ -262,11 +487,33 @@ export default async function HomePage() {
               }
             }
           }
+        },
+        ethDrop: {
+          select: {
+            id: true,
+            amountUnits: true,
+            senderId: true,
+            receiverId: true,
+            claimedAt: true,
+            sender: {
+              select: {
+                username: true
+              }
+            },
+            receiver: {
+              select: {
+                username: true
+              }
+            }
+          }
         }
       }
     })
   ]);
-  const [totalMembers, totalTours, shotOClockEvents] = telemetry;
+  const [totalMembers, totalTours, satoshiDropEvents, ethDropEvents] = telemetry;
+  const shotOClockEvents = satoshiDropEvents + ethDropEvents;
+  const kpiMax = Math.max(totalMembers, totalTours, shotOClockEvents, 1);
+  const kpiPct = (value: number) => `${Math.max(12, Math.round((value / kpiMax) * 100))}%`;
   const chatEntries = [...chatEntriesDesc].reverse();
 
   return (
@@ -285,6 +532,32 @@ export default async function HomePage() {
                   <img src="/icons/mascot.svg" alt="Mascot pixel icon" width={24} height={24} />
                 </div>
                 <OperatorDashboardDetails {...operatorDashboard} />
+              </RetroWindow>
+
+              <RetroWindow title="Member KPIs" className="home-top-panel home-top-panel--command-station">
+                <div className="card-list">
+                  <div className="card">
+                    <h3>Total Members</h3>
+                    <p className="meta">{totalMembers.toLocaleString()} members in system</p>
+                    <div className="submarine-chart__meter" aria-hidden>
+                      <span style={{ width: kpiPct(totalMembers) }} />
+                    </div>
+                  </div>
+                  <div className="card">
+                    <h3>Total Tours</h3>
+                    <p className="meta">{totalTours.toLocaleString()} published tours</p>
+                    <div className="submarine-chart__meter" aria-hidden>
+                      <span style={{ width: kpiPct(totalTours) }} />
+                    </div>
+                  </div>
+                  <div className="card">
+                    <h3>Shot O&apos;Clock Events</h3>
+                    <p className="meta">{shotOClockEvents.toLocaleString()} total transmissions</p>
+                    <div className="submarine-chart__meter" aria-hidden>
+                      <span style={{ width: kpiPct(shotOClockEvents) }} />
+                    </div>
+                  </div>
+                </div>
               </RetroWindow>
 
               <RetroWindow title="Travel Queue">
@@ -314,45 +587,22 @@ export default async function HomePage() {
               </RetroWindow>
             </div>
 
-            <div className="stack home-tracker-stack">
-              <RetroWindow title="Fleet Telemetry" className="home-top-panel home-top-panel--command-station">
-                <SubmarineCommandChart
-                  totalMembers={totalMembers}
-                  totalTours={totalTours}
-                  shotOClockEvents={shotOClockEvents}
-                />
-              </RetroWindow>
-              <RetroWindow title="Satoshi Tracker" className="home-top-panel home-top-panel--tracker-orange">
-                <BTCSatsChart
-                  initialPoints={btcWeekly.points}
-                  initialSource={btcWeekly.source}
-                  assetSymbol="BTC"
-                  spotEndpoint="/api/btc/spot"
-                  theme="orange"
-                />
-              </RetroWindow>
-              <RetroWindow title="ETH Tracker" className="home-top-panel home-top-panel--tracker-purple">
-                <BTCSatsChart
-                  initialPoints={ethWeekly.points}
-                  initialSource={ethWeekly.source}
-                  assetSymbol="ETH"
-                  spotEndpoint="/api/eth/spot"
-                  theme="purple"
-                />
-              </RetroWindow>
-            </div>
+            <HomeChartsColumn
+              btcInitial={{ points: btcWeekly.points, source: btcWeekly.source }}
+              ethInitial={{ points: ethWeekly.points, source: ethWeekly.source }}
+            />
           </div>
         </div>
 
         <aside className="home-chat-dock">
           <ChatAutoRefresh intervalMs={5000} />
-          <RetroWindow title="Live Chat Relay" className="home-chat-window">
+          <RetroWindow title="Chat Transmission" className="home-chat-window">
             <p className="meta">Synced with the Live Chat page. Realtime-ish refresh every 5 seconds.</p>
-            <div className="chat-thread home-chat-thread">
+            <ChatThreadViewport className="chat-thread home-chat-thread">
               {chatEntries.map((entry) => (
                 <article
                   key={entry.id}
-                  className={`chat-message ${entry.userId === user.id ? "chat-message--outbound" : "chat-message--inbound"} ${entry.satoshiDrop ? "chat-message--satoshi" : ""}`}
+                  className={`chat-message ${entry.userId === user.id ? "chat-message--outbound" : "chat-message--inbound"} ${entry.satoshiDrop ? "chat-message--satoshi" : ""} ${entry.ethDrop ? "chat-message--ethereum" : ""}`}
                 >
                   <p className="chat-message__body">{entry.message}</p>
                   {entry.satoshiDrop ? (
@@ -402,14 +652,66 @@ export default async function HomePage() {
                       </div>
                     </div>
                   ) : null}
+                  {entry.ethDrop ? (
+                    <div className="chat-sats-row">
+                      <p className="meta">
+                        transfer: {formatEthUnitsFromBase(entry.ethDrop.amountUnits)} ETH // from{" "}
+                        <ProfileLink username={entry.ethDrop.sender.username} />{" "}
+                        {entry.ethDrop.claimedAt ? (
+                          <>
+                            {"// accepted by "}
+                            {entry.ethDrop.receiver?.username ? (
+                              <ProfileLink username={entry.ethDrop.receiver.username} />
+                            ) : (
+                              "unknown"
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {"// awaiting accept by "}
+                            {entry.ethDrop.receiver?.username ? (
+                              <ProfileLink username={entry.ethDrop.receiver.username} />
+                            ) : (
+                              "anyone"
+                            )}
+                          </>
+                        )}
+                      </p>
+                      <div className="chat-sats-actions">
+                        {!entry.ethDrop.claimedAt &&
+                        entry.ethDrop.senderId !== user.id &&
+                        (!entry.ethDrop.receiverId || entry.ethDrop.receiverId === user.id) ? (
+                          <form action={acceptEthereumDropFromHome}>
+                            <input type="hidden" name="dropId" value={entry.ethDrop.id} />
+                            <NeonButton type="submit" className="chat-sats-accept-button">
+                              Accept
+                            </NeonButton>
+                          </form>
+                        ) : null}
+                        {!entry.ethDrop.claimedAt && entry.ethDrop.senderId === user.id ? (
+                          <form action={abortEthereumDropFromHome}>
+                            <input type="hidden" name="dropId" value={entry.ethDrop.id} />
+                            <NeonButton type="submit" className="chat-sats-abort-button">
+                              Abort
+                            </NeonButton>
+                          </form>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
                   <p className="meta">
                     {entry.user.displayName} (<ProfileLink username={entry.user.username} />) :: {entry.createdAt.toLocaleString()}
                   </p>
                 </article>
               ))}
-            </div>
+            </ChatThreadViewport>
             <div className="home-chat-form">
-              <LiveChatComposer action={sendHomeChatMessage} textareaId="home-chat-message" availableSats={user.btcSats} />
+              <LiveChatComposer
+                action={sendHomeChatMessage}
+                textareaId="home-chat-message"
+                availableSats={user.btcSats}
+                availableEthUnits={user.ethUnits}
+              />
             </div>
           </RetroWindow>
         </aside>

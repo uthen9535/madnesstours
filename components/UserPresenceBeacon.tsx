@@ -11,7 +11,7 @@ export function UserPresenceBeacon({ intervalMs = 15000 }: UserPresenceBeaconPro
     let cancelled = false;
 
     async function ping() {
-      if (cancelled || document.visibilityState !== "visible") {
+      if (cancelled) {
         return;
       }
 

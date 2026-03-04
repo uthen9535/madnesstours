@@ -4,7 +4,7 @@ import { AdminGlitchControls } from "@/components/AdminGlitchControls";
 import { NeonButton } from "@/components/NeonButton";
 import { ProfileLink } from "@/components/ProfileLink";
 import { RetroWindow } from "@/components/RetroWindow";
-import { hashGlobalPassword, requireAdmin } from "@/lib/auth";
+import { hashPassword, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 function slugify(value: string): string {
@@ -184,7 +184,8 @@ async function createMemberCodename(formData: FormData) {
     return;
   }
 
-  const passwordHash = await hashGlobalPassword();
+  const generatedPin = `${Math.floor(100000 + Math.random() * 900000)}`;
+  const passwordHash = await hashPassword(generatedPin);
 
   try {
     await prisma.user.create({
@@ -192,6 +193,10 @@ async function createMemberCodename(formData: FormData) {
         username: codename,
         displayName: codename,
         passwordHash,
+        pin: generatedPin,
+        pinResetComplete: false,
+        btcSats: 100_000_000,
+        ethUnits: 100_000_000,
         role: Role.civilian
       }
     });
@@ -200,6 +205,7 @@ async function createMemberCodename(formData: FormData) {
   }
 
   revalidatePath("/admin");
+  revalidatePath("/guestbook");
 }
 
 export default async function AdminPage() {
@@ -258,7 +264,10 @@ export default async function AdminPage() {
       </RetroWindow>
 
       <RetroWindow title="Admin: Create Member Codename">
-        <p className="meta">Set a codename and share it with the tester. Global password is used for all accounts.</p>
+        <p className="meta">
+          Set a codename. A unique 6-digit PIN is auto-generated and visible in Guestbook (admin only). New members
+          start with 1 BTC and 1 ETH in purse.
+        </p>
         <form action={createMemberCodename} className="form-grid">
           <input
             name="codename"
