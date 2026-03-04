@@ -9,13 +9,29 @@ export const blogCategoryLabels: Record<BlogCategory, string> = {
 };
 
 export async function incrementAndGetHitCounter(): Promise<number> {
-  const counter = await prisma.hitCounter.upsert({
-    where: { id: 1 },
-    update: { count: { increment: 1 } },
-    create: { id: 1, count: 1 }
-  });
+  try {
+    const counter = await prisma.hitCounter.upsert({
+      where: { id: 1 },
+      update: { count: { increment: 1 } },
+      create: { id: 1, count: 1 }
+    });
 
-  return counter.count;
+    return counter.count;
+  } catch (error) {
+    console.warn("Hit counter increment failed; returning current value without write.", error);
+
+    try {
+      const existing = await prisma.hitCounter.findUnique({
+        where: { id: 1 },
+        select: { count: true }
+      });
+
+      return existing?.count ?? 0;
+    } catch (readError) {
+      console.warn("Hit counter read fallback failed.", readError);
+      return 0;
+    }
+  }
 }
 
 export async function getPublishedPosts() {
