@@ -11,8 +11,10 @@ type OperatorDashboardDetailsProps = {
   health: number;
   liveChatMessages: number;
   travelStamps: number;
-  punches: number;
+  punchesMad: number;
+  punchesMay: number;
   operations: string;
+  surfacedLabel: string;
   btcSats: number;
   ethUnits: number;
 };
@@ -25,8 +27,10 @@ export function OperatorDashboardDetails({
   health,
   liveChatMessages,
   travelStamps,
-  punches,
+  punchesMad,
+  punchesMay,
   operations,
+  surfacedLabel,
   btcSats,
   ethUnits
 }: OperatorDashboardDetailsProps) {
@@ -37,11 +41,6 @@ export function OperatorDashboardDetails({
       </div>
       <p className="meta">health: {health}%</p>
       <TerminalBlock>
-        <div>role: {role}</div>
-        <div>
-          codename: <ProfileLink username={username} />
-        </div>
-        <div>agent condition: {statusLabel}</div>
         <div>
           wired:{" "}
           {wired ? (
@@ -53,13 +52,19 @@ export function OperatorDashboardDetails({
             "negative"
           )}
         </div>
-        <div>live chat messages: {liveChatMessages}</div>
-        <div>travel stamps: {travelStamps}</div>
-        <div>punches: {punches}</div>
-        <div>operations: {operations || "none logged"}</div>
+        <div>
+          codename: <ProfileLink username={username} />
+        </div>
+        <div>role: {role}</div>
+        <div>punches: {punchesMad} MAD // {punchesMay} MAY</div>
         <div>
           purse: {formatBtcUnitsFromSats(btcSats)} BTC // {formatEthUnitsFromBase(ethUnits)} ETH
         </div>
+        <div>stamps: {travelStamps}</div>
+        <div>agent condition: {statusLabel}</div>
+        <div>live chat messages: {liveChatMessages}</div>
+        <div>operations: {operations || "none logged"}</div>
+        <div>surfaced: {surfacedLabel}</div>
       </TerminalBlock>
     </div>
   );

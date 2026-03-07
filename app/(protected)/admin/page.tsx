@@ -1,11 +1,18 @@
-import { BlogCategory, MediaType, Role, TripMissionStatus } from "@prisma/client";
+import { BlogCategory, MediaAssetStatus, MediaType, MediaUploadSessionStatus, Role, TripMissionStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { AdminGlitchControls } from "@/components/AdminGlitchControls";
 import { NeonButton } from "@/components/NeonButton";
 import { ProfileLink } from "@/components/ProfileLink";
 import { RetroWindow } from "@/components/RetroWindow";
-import { hashPassword, requireAdmin } from "@/lib/auth";
+import { TripMediaUploadDropzone } from "@/components/TripMediaUploadDropzone";
+import { hashPassword, requireAdmin, requireUser } from "@/lib/auth";
+import { deleteMediaAsset, queueMediaReprocess } from "@/lib/media/upload-service";
+import { encodeMayhemPunchLabel } from "@/lib/punchLabels";
 import { prisma } from "@/lib/prisma";
+import { withSqliteRetry } from "@/lib/sqliteRetry";
+
+const TRIP_COVER_MARKER_TITLE = "__trip_cover__";
+const MAX_COVER_UPLOAD_BYTES = 1_500_000;
 
 function slugify(value: string): string {
   return value
@@ -15,10 +22,38 @@ function slugify(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+async function toDataUrl(file: File): Promise<string> {
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const mime = file.type && file.type.startsWith("image/") ? file.type : "image/png";
+  return `data:${mime};base64,${bytes.toString("base64")}`;
+}
+
+async function resolveUniquePostSlug(baseSlug: string): Promise<string> {
+  const initial = baseSlug || "broadcast";
+  let candidate = initial;
+  let counter = 2;
+
+  while (true) {
+    const exists = await withSqliteRetry(() =>
+      prisma.blogPost.findUnique({
+        where: { slug: candidate },
+        select: { id: true }
+      })
+    );
+
+    if (!exists) {
+      return candidate;
+    }
+
+    candidate = `${initial}-${counter}`;
+    counter += 1;
+  }
+}
+
 async function createPost(formData: FormData) {
   "use server";
 
-  const admin = await requireAdmin();
+  const user = await requireUser();
   const title = String(formData.get("title") ?? "").trim();
   const rawSlug = String(formData.get("slug") ?? "").trim();
   const excerpt = String(formData.get("excerpt") ?? "").trim();
@@ -30,22 +65,29 @@ async function createPost(formData: FormData) {
     return;
   }
 
-  const slug = rawSlug ? slugify(rawSlug) : slugify(title);
+  const slug = await resolveUniquePostSlug(rawSlug ? slugify(rawSlug) : slugify(title));
   if (!slug) {
     return;
   }
 
-  await prisma.blogPost.create({
-    data: {
-      title,
-      slug,
-      excerpt,
-      content,
-      category,
-      published,
-      authorId: admin.id
-    }
-  });
+  try {
+    await withSqliteRetry(() =>
+      prisma.blogPost.create({
+        data: {
+          title,
+          slug,
+          excerpt,
+          content,
+          category,
+          published,
+          authorId: user.id
+        }
+      })
+    );
+  } catch (error) {
+    console.error("blog publish failed", error);
+    return;
+  }
 
   revalidatePath("/blog");
   revalidatePath("/admin");
@@ -55,9 +97,8 @@ async function createPost(formData: FormData) {
 async function createTrip(formData: FormData) {
   "use server";
 
-  await requireAdmin();
+  const admin = await requireAdmin();
   const title = String(formData.get("title") ?? "").trim();
-  const rawSlug = String(formData.get("slug") ?? "").trim();
   const location = String(formData.get("location") ?? "").trim();
   const summary = String(formData.get("summary") ?? "").trim();
   const content = String(formData.get("content") ?? "").trim();
@@ -67,11 +108,14 @@ async function createTrip(formData: FormData) {
   const mapY = Number(formData.get("mapY") ?? 50);
   const latitudeRaw = String(formData.get("latitude") ?? "").trim();
   const longitudeRaw = String(formData.get("longitude") ?? "").trim();
-  const stampLabel = String(formData.get("stampLabel") ?? "").trim();
+  const madnessPunchLabel = String(formData.get("madnessPunchLabel") ?? "").trim();
+  const mayhemPunchLabel = String(formData.get("mayhemPunchLabel") ?? "").trim();
+  const coverPhotoFile = formData.get("coverPhotoFile");
+  const uploadedCoverPhoto = coverPhotoFile instanceof File && coverPhotoFile.size > 0 ? coverPhotoFile : null;
   const missionStatus = String(formData.get("missionStatus") ?? TripMissionStatus.MISSION_COMPLETE).trim();
   const published = formData.get("published") === "on";
 
-  if (!title || !location || !summary || !content || !stampLabel) {
+  if (!title || !location || !summary || !content || !madnessPunchLabel) {
     return;
   }
 
@@ -79,7 +123,7 @@ async function createTrip(formData: FormData) {
     return;
   }
 
-  const slug = rawSlug ? slugify(rawSlug) : slugify(title);
+  const slug = slugify(title);
   if (!slug) {
     return;
   }
@@ -101,31 +145,60 @@ async function createTrip(formData: FormData) {
     return;
   }
 
-  const trip = await prisma.trip.create({
-    data: {
-      title,
-      slug,
-      location,
-      summary,
-      content,
-      startDate: start,
-      endDate: end,
-      mapX: Number.isFinite(mapX) ? mapX : 50,
-      mapY: Number.isFinite(mapY) ? mapY : 50,
-      latitude,
-      longitude,
-      missionStatus: missionStatus as TripMissionStatus,
-      badgeName: stampLabel,
-      stampLabel,
-      published
-    }
-  });
+  let trip: { id: string; slug: string };
+  try {
+    trip = await prisma.trip.create({
+      data: {
+        title,
+        slug,
+        location,
+        summary,
+        content,
+        startDate: start,
+        endDate: end,
+        mapX: Number.isFinite(mapX) ? mapX : 50,
+        mapY: Number.isFinite(mapY) ? mapY : 50,
+        latitude,
+        longitude,
+        missionStatus: missionStatus as TripMissionStatus,
+        badgeName: encodeMayhemPunchLabel(mayhemPunchLabel),
+        stampLabel: madnessPunchLabel,
+        published
+      },
+      select: { id: true, slug: true }
+    });
+  } catch {
+    return;
+  }
 
-  revalidatePath("/trips");
+  if (uploadedCoverPhoto) {
+    if (uploadedCoverPhoto.size <= MAX_COVER_UPLOAD_BYTES && uploadedCoverPhoto.type.startsWith("image/")) {
+      try {
+        const coverPhotoUrl = await toDataUrl(uploadedCoverPhoto);
+        await prisma.mediaItem.create({
+          data: {
+            title: TRIP_COVER_MARKER_TITLE,
+            description: "tour cover marker",
+            url: coverPhotoUrl,
+            type: MediaType.OTHER,
+            tripId: trip.id,
+            uploadedById: admin.id,
+            approved: true,
+            approvedAt: new Date(),
+            approvedById: admin.id
+          }
+        });
+      } catch {
+        // Keep tour creation successful even if the optional cover upload fails.
+      }
+    }
+  }
+
+  revalidatePath("/tours");
   revalidatePath("/map");
   revalidatePath("/stamps");
   revalidatePath("/admin");
-  revalidatePath(`/trips/${trip.slug}`);
+  revalidatePath(`/tours/${trip.slug}`);
 }
 
 async function approveMedia(formData: FormData) {
@@ -168,7 +241,79 @@ async function approveMedia(formData: FormData) {
 
   revalidatePath("/admin");
   if (item.trip?.slug) {
-    revalidatePath(`/trips/${item.trip.slug}`);
+    revalidatePath(`/tours/${item.trip.slug}`);
+  }
+}
+
+async function reprocessMediaAssetAction(formData: FormData) {
+  "use server";
+
+  await requireAdmin();
+  const mediaId = String(formData.get("mediaId") ?? "").trim();
+
+  if (!mediaId) {
+    return;
+  }
+
+  const asset = await prisma.mediaAsset.findFirst({
+    where: {
+      id: mediaId,
+      deletedAt: null
+    },
+    select: {
+      id: true,
+      trip: {
+        select: {
+          slug: true
+        }
+      }
+    }
+  });
+
+  if (!asset) {
+    return;
+  }
+
+  queueMediaReprocess(asset.id);
+  revalidatePath("/admin");
+  if (asset.trip?.slug) {
+    revalidatePath(`/tours/${asset.trip.slug}`);
+  }
+}
+
+async function deleteMediaAssetAction(formData: FormData) {
+  "use server";
+
+  await requireAdmin();
+  const mediaId = String(formData.get("mediaId") ?? "").trim();
+
+  if (!mediaId) {
+    return;
+  }
+
+  const asset = await prisma.mediaAsset.findFirst({
+    where: {
+      id: mediaId,
+      deletedAt: null
+    },
+    select: {
+      id: true,
+      trip: {
+        select: {
+          slug: true
+        }
+      }
+    }
+  });
+
+  if (!asset) {
+    return;
+  }
+
+  await deleteMediaAsset(asset.id);
+  revalidatePath("/admin");
+  if (asset.trip?.slug) {
+    revalidatePath(`/tours/${asset.trip.slug}`);
   }
 }
 
@@ -209,9 +354,45 @@ async function createMemberCodename(formData: FormData) {
 }
 
 export default async function AdminPage() {
-  await requireAdmin();
+  const user = await requireUser();
+  const isAdmin = user.role === Role.admin;
 
-  const [recentMessages, recentPosts, trips, pendingTripMedia] = await Promise.all([
+  if (!isAdmin) {
+    return (
+      <div className="stack admin-command-page">
+        <RetroWindow title="Admin: Publish Blog Post">
+          <form action={createPost} className="form-grid">
+            <input name="title" placeholder="Title" required />
+            <input name="slug" placeholder="Slug (optional)" />
+            <input name="excerpt" placeholder="Excerpt" />
+            <select name="category" required defaultValue={BlogCategory.BTC}>
+              {Object.values(BlogCategory).map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+            <textarea name="content" placeholder="Markdown content" required />
+            <label>
+              <input type="checkbox" name="published" defaultChecked /> Publish now
+            </label>
+            <NeonButton type="submit">Save Post</NeonButton>
+          </form>
+        </RetroWindow>
+      </div>
+    );
+  }
+
+  const [
+    recentMessages,
+    recentPosts,
+    trips,
+    pendingTripMedia,
+    failedPipelineMedia,
+    processingPipelineMedia,
+    mediaAssetStatusCounts,
+    mediaSessionStatusCounts
+  ] = await Promise.all([
     prisma.guestbookEntry.findMany({
       orderBy: { createdAt: "desc" },
       take: 10,
@@ -253,8 +434,76 @@ export default async function AdminPage() {
           }
         }
       }
+    }),
+    prisma.mediaAsset.findMany({
+      where: {
+        deletedAt: null,
+        status: MediaAssetStatus.FAILED
+      },
+      orderBy: { createdAt: "desc" },
+      take: 120,
+      include: {
+        uploader: {
+          select: {
+            displayName: true,
+            username: true
+          }
+        },
+        trip: {
+          select: {
+            title: true,
+            slug: true
+          }
+        }
+      }
+    }),
+    prisma.mediaAsset.findMany({
+      where: {
+        deletedAt: null,
+        status: { in: [MediaAssetStatus.UPLOADING, MediaAssetStatus.PROCESSING] }
+      },
+      orderBy: { createdAt: "desc" },
+      take: 120,
+      include: {
+        uploader: {
+          select: {
+            displayName: true,
+            username: true
+          }
+        },
+        trip: {
+          select: {
+            title: true,
+            slug: true
+          }
+        }
+      }
+    }),
+    prisma.mediaAsset.groupBy({
+      by: ["status"],
+      where: {
+        deletedAt: null
+      },
+      _count: {
+        _all: true
+      }
+    }),
+    prisma.mediaUploadSession.groupBy({
+      by: ["status"],
+      _count: {
+        _all: true
+      }
     })
   ]);
+  const mediaAssetCountByStatus = new Map(mediaAssetStatusCounts.map((row) => [row.status, row._count._all]));
+  const mediaSessionCountByStatus = new Map(mediaSessionStatusCounts.map((row) => [row.status, row._count._all]));
+  const failedAssetCount = mediaAssetCountByStatus.get(MediaAssetStatus.FAILED) ?? 0;
+  const uploadingAssetCount = mediaAssetCountByStatus.get(MediaAssetStatus.UPLOADING) ?? 0;
+  const processingAssetCount = mediaAssetCountByStatus.get(MediaAssetStatus.PROCESSING) ?? 0;
+  const readyAssetCount = mediaAssetCountByStatus.get(MediaAssetStatus.READY) ?? 0;
+  const uploadingSessionCount = mediaSessionCountByStatus.get(MediaUploadSessionStatus.UPLOADING) ?? 0;
+  const processingSessionCount = mediaSessionCountByStatus.get(MediaUploadSessionStatus.PROCESSING) ?? 0;
+  const failedSessionCount = mediaSessionCountByStatus.get(MediaUploadSessionStatus.FAILED) ?? 0;
 
   return (
     <div className="stack admin-command-page">
@@ -303,17 +552,38 @@ export default async function AdminPage() {
         </form>
       </RetroWindow>
 
-      <RetroWindow title="Admin: Create Trip">
+      <RetroWindow title="Admin: Create Tour">
         <form action={createTrip} className="form-grid">
-          <input name="title" placeholder="Trip title" required />
-          <input name="slug" placeholder="Slug (optional)" />
+          <input name="title" placeholder="Tour title" required />
+          <label htmlFor="mission-status">Mission status</label>
+          <select id="mission-status" name="missionStatus" defaultValue={TripMissionStatus.MISSION_COMPLETE}>
+            <option value={TripMissionStatus.MISSION_COMPLETE}>Mission complete (pink)</option>
+            <option value={TripMissionStatus.MISSION_OBJECTIVE}>Mission objective (green live)</option>
+          </select>
           <input name="location" placeholder="Location" required />
-          <input name="summary" placeholder="Summary" required />
-          <textarea name="content" placeholder="Trip markdown" required />
           <label htmlFor="start-date">Start date</label>
           <input id="start-date" name="startDate" type="date" required />
           <label htmlFor="end-date">End date</label>
           <input id="end-date" name="endDate" type="date" required />
+          <input name="summary" placeholder="Summary" required />
+          <textarea name="content" placeholder="Tour markdown" required />
+          <input name="madnessPunchLabel" placeholder="Madness Punch Label" required />
+          <input name="mayhemPunchLabel" placeholder="Mayhem Punch Label (optional)" />
+          <div>
+            <p className="meta">Cover Photo Image</p>
+            <TripMediaUploadDropzone
+              inputName="coverPhotoFile"
+              multiple={false}
+              required={false}
+              accept="image/*"
+              title="Click to upload cover photo or drag and drop here"
+              helperText="Upload one image (max 1.5 MB)."
+              maxBytesPerFile={1_500_000}
+            />
+          </div>
+          <label>
+            <input type="checkbox" name="published" defaultChecked /> Visible on tours pages
+          </label>
           <label htmlFor="map-x">Map X (%)</label>
           <input id="map-x" name="mapX" type="number" min={0} max={100} defaultValue={50} required />
           <label htmlFor="map-y">Map Y (%)</label>
@@ -322,16 +592,7 @@ export default async function AdminPage() {
           <input id="latitude" name="latitude" type="number" min={-90} max={90} step="any" />
           <label htmlFor="longitude">Longitude (optional, -180 to 180)</label>
           <input id="longitude" name="longitude" type="number" min={-180} max={180} step="any" />
-          <label htmlFor="mission-status">Mission status</label>
-          <select id="mission-status" name="missionStatus" defaultValue={TripMissionStatus.MISSION_COMPLETE}>
-            <option value={TripMissionStatus.MISSION_COMPLETE}>Mission complete (pink)</option>
-            <option value={TripMissionStatus.MISSION_OBJECTIVE}>Mission objective (green live)</option>
-          </select>
-          <input name="stampLabel" placeholder="Stamp label" required />
-          <label>
-            <input type="checkbox" name="published" defaultChecked /> Publish now
-          </label>
-          <NeonButton type="submit">Save Trip</NeonButton>
+          <NeonButton type="submit">Save Tour</NeonButton>
         </form>
       </RetroWindow>
 
@@ -349,14 +610,14 @@ export default async function AdminPage() {
         </div>
       </RetroWindow>
 
-      <RetroWindow title={`Admin: Pending Trip Media (${pendingTripMedia.length})`}>
-        {pendingTripMedia.length === 0 ? <p className="meta">No pending trip uploads.</p> : null}
+      <RetroWindow title={`Admin: Pending Tour Media (${pendingTripMedia.length})`}>
+        {pendingTripMedia.length === 0 ? <p className="meta">No pending tour uploads.</p> : null}
         <div className="card-list">
           {pendingTripMedia.map((item) => (
             <article key={item.id} className="card">
               <strong>{item.title}</strong>
               <p className="meta">
-                {item.type} :: {item.trip?.title ?? "Unknown Trip"} ({item.trip?.slug ?? "no-slug"})
+                {item.type} :: {item.trip?.title ?? "Unknown Tour"} ({item.trip?.slug ?? "no-slug"})
               </p>
               <p className="meta">
                 by {item.uploadedBy.displayName} (<ProfileLink username={item.uploadedBy.username} />)
@@ -366,6 +627,62 @@ export default async function AdminPage() {
                 <input type="hidden" name="mediaId" value={item.id} />
                 <NeonButton type="submit">Approve Media</NeonButton>
               </form>
+            </article>
+          ))}
+        </div>
+      </RetroWindow>
+
+      <RetroWindow title={`Admin: Media Pipeline Failures (${failedAssetCount})`}>
+        <p className="meta">
+          showing latest {failedPipelineMedia.length} failures :: assets ready {readyAssetCount} :: processing {processingAssetCount} ::
+          uploading {uploadingAssetCount}
+        </p>
+        {failedPipelineMedia.length === 0 ? <p className="meta">No failed media processing jobs.</p> : null}
+        <div className="card-list">
+          {failedPipelineMedia.map((item) => (
+            <article key={item.id} className="card">
+              <strong>{item.title ?? item.originalFilename}</strong>
+              <p className="meta">
+                {item.fileType} :: {item.trip?.title ?? "No Tour"} ({item.trip?.slug ?? "n/a"})
+              </p>
+              <p className="meta">
+                by {item.uploader.displayName} (<ProfileLink username={item.uploader.username} />)
+              </p>
+              {item.errorMessage ? <p className="meta">{item.errorMessage}</p> : null}
+              <form action={reprocessMediaAssetAction} className="form-grid">
+                <input type="hidden" name="mediaId" value={item.id} />
+                <NeonButton type="submit">Reprocess</NeonButton>
+              </form>
+              <form action={deleteMediaAssetAction} className="form-grid">
+                <input type="hidden" name="mediaId" value={item.id} />
+                <NeonButton type="submit" className="trip-media-gallery__delete-button">
+                  Delete
+                </NeonButton>
+              </form>
+            </article>
+          ))}
+        </div>
+      </RetroWindow>
+
+      <RetroWindow title={`Admin: Active Media Processing (${processingAssetCount + uploadingAssetCount})`}>
+        <p className="meta">
+          assets uploading {uploadingAssetCount} :: assets processing {processingAssetCount} :: sessions uploading {uploadingSessionCount}
+          :: sessions processing {processingSessionCount} :: sessions failed {failedSessionCount}
+        </p>
+        {processingPipelineMedia.length === 0 ? <p className="meta">No active media processing jobs.</p> : null}
+        <div className="card-list">
+          {processingPipelineMedia.map((item) => (
+            <article key={item.id} className="card">
+              <strong>{item.title ?? item.originalFilename}</strong>
+              <p className="meta">
+                {item.status} :: {item.fileType}
+              </p>
+              <p className="meta">
+                {item.trip?.title ?? "No Tour"} ({item.trip?.slug ?? "n/a"})
+              </p>
+              <p className="meta">
+                by {item.uploader.displayName} (<ProfileLink username={item.uploader.username} />)
+              </p>
             </article>
           ))}
         </div>
@@ -385,7 +702,7 @@ export default async function AdminPage() {
           </div>
         </RetroWindow>
 
-        <RetroWindow title="Recent Trips">
+        <RetroWindow title="Recent Tours">
           <div className="card-list">
             {trips.map((trip) => (
               <div key={trip.id} className="card">

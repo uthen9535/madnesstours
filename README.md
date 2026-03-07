@@ -11,11 +11,11 @@ Private retro 90s-style website for the Madness Tour group.
 
 ## Features
 
-- Front-door login (`/login`) and protected member area (`/home`, `/map`, `/trips`, `/blog`, `/vault`, `/guestbook`)
+- Front-door login (`/login`) and protected member area (`/home`, `/map`, `/tours`, `/blog`, `/vault`, `/guestbook`)
 - Admin-only control panel (`/admin`) for:
   - Creating member codenames
   - Publishing blog posts
-  - Creating trips
+  - Creating tours
   - Uploading media metadata
   - Monitoring live chat activity
 - Retro 90s visual system:
@@ -35,7 +35,7 @@ Private retro 90s-style website for the Madness Tour group.
   - Falls back to static values if API fetch fails/offline
 - Travel mascot RPG:
   - Clickable retrofuturist world map (local SVG, no API key)
-  - Trip stamp unlocks
+  - Tour stamp unlocks
   - Badge shelf on member profiles
   - Seeded destinations: Madness I: Lake Powell, Madness II: Carribean Cruise, Madness III: Bali
 
@@ -44,8 +44,8 @@ Private retro 90s-style website for the Madness Tour group.
 - `/login`
 - `/home`
 - `/map`
-- `/trips`
-- `/trips/[slug]`
+- `/tours`
+- `/tours/[slug]`
 - `/blog`
 - `/blog/[slug]`
 - `/vault`
@@ -174,4 +174,4 @@ Global password for all accounts: `finnsbeachclub` (override with `GLOBAL_SITE_P
 
 - Database file uses SQLite via `DATABASE_URL="file:./dev.db"` in `.env`.
 - Public signup is disabled. Admin creates tester accounts in `/admin` under "Create Member Codename".
-- Blog/trip editors in admin are plain markdown textareas by design.
+- Blog/tour editors in admin are plain markdown textareas by design.

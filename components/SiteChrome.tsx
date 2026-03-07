@@ -5,12 +5,17 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { DeepChatsGatekeeper } from "@/components/DeepChatsGatekeeper";
 import { MarqueeBanner } from "@/components/MarqueeBanner";
+import { MissionCountdownModule } from "@/components/MissionCountdownModule";
 import { NeonButton } from "@/components/NeonButton";
 
 type SiteChromeProps = {
   username: string;
   role: string;
   hitCount: number;
+  missionObjective: {
+    title: string;
+    startDateIso: string;
+  } | null;
   btc: {
     blockHeight: number;
     usdPrice: number;
@@ -19,23 +24,37 @@ type SiteChromeProps = {
   children: ReactNode;
 };
 
-const links = [
+type NavLink = {
+  href: string;
+  label: string;
+  command?: boolean;
+};
+
+const baseLinks: NavLink[] = [
   { href: "/home", label: "Home" },
+  { href: "/tours", label: "Tours" },
   { href: "/map", label: "Map" },
-  { href: "/trips", label: "Tours" },
-  { href: "/stamps", label: "Stamps" },
-  { href: "/blog", label: "Blog" },
-  { href: "/deep-chats", label: "Deep Chats" },
-  { href: "/vault", label: "Vault" },
   { href: "/guestbook", label: "Guestbook" },
+  { href: "/relic-vault", label: "Relic Vault" },
+  { href: "/library", label: "Library" },
+  { href: "/laboratory", label: "Laboratory" },
+  { href: "/deep-chats", label: "Deep Chats" },
+  { href: "/blog", label: "Blog" }
+];
+
+const commandLinks: NavLink[] = [
+  ...baseLinks,
   { href: "/admin", label: "Admin", command: true },
   { href: "/staging", label: "Testing", command: true }
 ];
 
-export function SiteChrome({ username, role, hitCount, btc, children }: SiteChromeProps) {
+const civilianLinks: NavLink[] = [...baseLinks, { href: "/admin", label: "Admin", command: true }];
+
+export function SiteChrome({ username, role, hitCount, missionObjective, btc, children }: SiteChromeProps) {
   const pathname = usePathname();
+  const isCommandUser = role === "admin";
   const [muteAudio, setMuteAudio] = useState(false);
-  const [cyberpunkOverlay, setCyberpunkOverlay] = useState(false);
+  const [cyberpunkOverlay, setCyberpunkOverlay] = useState(true);
 
   useEffect(() => {
     const savedMute = localStorage.getItem("madnessnet_mute");
@@ -45,7 +64,7 @@ export function SiteChrome({ username, role, hitCount, btc, children }: SiteChro
       setMuteAudio(savedMute === "true");
     }
 
-    if (savedCyberpunk) {
+    if (savedCyberpunk !== null) {
       setCyberpunkOverlay(savedCyberpunk === "true");
     }
   }, []);
@@ -87,6 +106,7 @@ export function SiteChrome({ username, role, hitCount, btc, children }: SiteChro
       maximumFractionDigits: 0
     }).format(btc.usdPrice);
   }, [btc.usdPrice]);
+  const navLinks = isCommandUser ? commandLinks : civilianLinks;
 
   return (
     <div className="shell">
@@ -97,9 +117,10 @@ export function SiteChrome({ username, role, hitCount, btc, children }: SiteChro
       <header className="shell-header">
         <div className="shell-header__title">
           <h1>MadnessNet</h1>
-          <p>Welcome back, {username} ({role})</p>
+          <p>Welcome back, {username} ({isCommandUser ? "command" : "civilian"})</p>
         </div>
         <div className="shell-header__meta">
+          <MissionCountdownModule objective={missionObjective} />
           <span className="hit-counter">Hits: {hitCount.toString().padStart(7, "0")}</span>
           <NeonButton type="button" onClick={() => setCyberpunkOverlay((value) => !value)}>
             {cyberpunkOverlay ? "Disable Cyberpunk" : "Enable Cyberpunk"}
@@ -148,12 +169,8 @@ export function SiteChrome({ username, role, hitCount, btc, children }: SiteChro
         </div>
       </header>
       <nav className="shell-nav" aria-label="Main navigation">
-        {links.map((link) => {
+        {navLinks.map((link) => {
           const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
-          if ((link.href === "/admin" || link.href === "/staging") && role !== "admin") {
-            return null;
-          }
-
           const classes = ["shell-nav__link"];
           if (link.command) {
             classes.push("shell-nav__link--command");
@@ -168,7 +185,7 @@ export function SiteChrome({ username, role, hitCount, btc, children }: SiteChro
               href={link.href}
               className={classes.join(" ")}
             >
-              {link.label}
+              {link.href === "/admin" ? (isCommandUser ? "Command Admin" : "Civilian Admin") : link.label}
             </Link>
           );
         })}

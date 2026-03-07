@@ -22,12 +22,16 @@ function isBreachMode(value: unknown): value is BreachMode {
 }
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const sinceRaw = Number(searchParams.get("since") ?? "");
-  const since = Number.isFinite(sinceRaw) ? sinceRaw : undefined;
+  try {
+    const { searchParams } = new URL(request.url);
+    const sinceRaw = Number(searchParams.get("since") ?? "");
+    const since = Number.isFinite(sinceRaw) ? sinceRaw : undefined;
 
-  const event = await getLatestSystemAttackBroadcast(since);
-  return noStoreJson({ event });
+    const event = await getLatestSystemAttackBroadcast(since);
+    return noStoreJson({ event });
+  } catch {
+    return noStoreJson({ event: null });
+  }
 }
 
 export async function POST(request: Request) {
@@ -48,6 +52,10 @@ export async function POST(request: Request) {
     return noStoreJson({ event: null }, 400);
   }
 
-  const event = await issueSystemAttackBroadcast(mode, user.username);
-  return noStoreJson({ event });
+  try {
+    const event = await issueSystemAttackBroadcast(mode, user.username);
+    return noStoreJson({ event });
+  } catch {
+    return noStoreJson({ event: null }, 503);
+  }
 }

@@ -1,0 +1,667 @@
+.libraryPage {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+}
+
+.libraryColumns {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.sideColumn {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.libraryBackdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.pixelBlob {
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  border: 1px dashed rgb(120 255 225 / 18%);
+  box-shadow:
+    inset 0 0 0 1px rgb(122 246 255 / 9%),
+    0 0 30px rgb(135 106 255 / 12%);
+  transform: rotate(45deg);
+  animation: blobDrift 14s linear infinite;
+}
+
+.pixelBlob:nth-child(1) {
+  left: -2rem;
+  top: 5%;
+}
+
+.pixelBlob:nth-child(2) {
+  right: 8%;
+  top: 27%;
+  animation-delay: -4s;
+}
+
+.pixelBlob:nth-child(3) {
+  right: -1rem;
+  bottom: 12%;
+  animation-delay: -8s;
+}
+
+.section {
+  position: relative;
+  border: 1px solid rgb(76 152 162 / 38%);
+  background:
+    linear-gradient(180deg, rgb(6 31 40 / 88%), rgb(5 20 28 / 92%));
+  box-shadow:
+    inset 0 0 0 1px rgb(124 248 233 / 7%),
+    0 8px 20px rgb(0 0 0 / 32%);
+  padding: 0.8rem;
+  display: grid;
+  gap: 0.74rem;
+}
+
+.section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, rgb(110 242 237 / 3%) 0, rgb(110 242 237 / 3%) 1px, transparent 1px, transparent 4px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.sectionHeader {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.sectionHeaderCompact {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.kicker {
+  margin: 0;
+  font-size: 0.63rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: #84c8d5;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: clamp(1.04rem, 2.7vw, 1.34rem);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #e2fffb;
+  text-shadow: 0 0 10px rgb(112 255 236 / 20%);
+}
+
+.sectionSub {
+  margin: 0.24rem 0 0;
+  color: #9ec7d1;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.loadMeter {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.loadMeterTrack {
+  position: relative;
+  height: 8px;
+  border: 1px solid rgb(93 159 171 / 42%);
+  background: rgb(5 17 25 / 86%);
+  overflow: hidden;
+}
+
+.loadMeterFill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, rgb(76 198 217 / 88%), rgb(124 255 229 / 95%));
+  transition: width 220ms ease;
+}
+
+.loadMeterLabel {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9fc9d4;
+}
+
+.archiveControls {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.searchInput {
+  width: 100%;
+  border: 1px solid rgb(87 151 164 / 50%);
+  background: rgb(5 18 26 / 90%);
+  color: #dffdf9;
+  font: inherit;
+  padding: 0.48rem 0.55rem;
+}
+
+.searchInput::placeholder {
+  color: rgb(137 177 187 / 85%);
+}
+
+.addMemeButton {
+  align-self: center;
+  border-color: rgb(255 202 106 / 65%);
+  color: #ffd995;
+  background:
+    linear-gradient(180deg, rgb(106 75 26 / 92%), rgb(58 41 12 / 95%));
+  box-shadow: 0 0 10px rgb(255 185 94 / 30%);
+}
+
+.emptyWall {
+  border: 1px dashed rgb(124 190 205 / 38%);
+  background: rgb(4 17 24 / 72%);
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 0.34rem;
+  color: #c6e2e8;
+}
+
+.emptyWall p,
+.emptyWall span {
+  margin: 0;
+}
+
+.emptyWall span {
+  font-size: 0.73rem;
+  color: #87afba;
+}
+
+.memeWall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.memeCard {
+  position: relative;
+  border: 1px solid rgb(95 159 171 / 52%);
+  background: linear-gradient(180deg, rgb(9 33 45 / 95%), rgb(8 22 31 / 97%));
+  box-shadow:
+    inset 0 0 0 1px rgb(131 250 242 / 8%),
+    0 6px 16px rgb(0 0 0 / 36%);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  overflow: hidden;
+}
+
+.memeCard:hover {
+  transform: translateY(-4px) scale(1.01);
+  border-color: rgb(137 243 228 / 66%);
+  box-shadow:
+    inset 0 0 0 1px rgb(131 250 242 / 10%),
+    0 10px 20px rgb(0 0 0 / 45%);
+}
+
+.tapeTopLeft,
+.tapeTopRight {
+  position: absolute;
+  z-index: 2;
+  width: 34px;
+  height: 12px;
+  background: rgb(255 251 214 / 70%);
+  opacity: 0.58;
+}
+
+.tapeTopLeft {
+  left: 7px;
+  top: 7px;
+  transform: rotate(-18deg);
+}
+
+.tapeTopRight {
+  right: 7px;
+  top: 7px;
+  transform: rotate(20deg);
+}
+
+.memeImage {
+  display: block;
+  width: 100%;
+  height: 178px;
+  object-fit: cover;
+  border-bottom: 1px solid rgb(87 146 159 / 40%);
+  background: rgb(6 13 18);
+}
+
+.memePreviewButton {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.memePreviewButton:focus-visible {
+  outline: 2px solid rgb(132 248 236 / 72%);
+  outline-offset: -2px;
+}
+
+.memeMeta {
+  padding: 0.45rem;
+  display: grid;
+  gap: 0.23rem;
+}
+
+.memeUploader,
+.memeTimestamp,
+.memeCaption {
+  margin: 0;
+}
+
+.memeUploader {
+  font-size: 0.71rem;
+  color: #c9fff5;
+  letter-spacing: 0.07em;
+}
+
+.memeTimestamp {
+  font-size: 0.62rem;
+  color: #89acb7;
+  letter-spacing: 0.08em;
+}
+
+.memeCaption {
+  font-size: 0.72rem;
+  color: #b0d3dc;
+  line-height: 1.35;
+}
+
+.memeHint {
+  margin: 0;
+  font-size: 0.62rem;
+  color: #8db4bf;
+  letter-spacing: 0.05em;
+}
+
+.memeActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.memeDeleteButton {
+  appearance: none;
+  border: 1px solid rgb(191 116 114 / 54%);
+  background: linear-gradient(180deg, rgb(63 24 23 / 92%), rgb(40 13 12 / 94%));
+  color: #ffc6cc;
+  font: inherit;
+  font-size: 0.63rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.2rem 0.42rem;
+  cursor: pointer;
+}
+
+.memeDeleteButton:disabled {
+  opacity: 0.62;
+  cursor: wait;
+}
+
+.tilt0 {
+  transform: rotate(-1.3deg);
+}
+
+.tilt1 {
+  transform: rotate(1.1deg);
+}
+
+.tilt2 {
+  transform: rotate(-0.5deg);
+}
+
+.tilt3 {
+  transform: rotate(0.8deg);
+}
+
+.tilt4 {
+  transform: rotate(-0.9deg);
+}
+
+.tilt5 {
+  transform: rotate(0.4deg);
+}
+
+.paginationRow {
+  display: flex;
+  justify-content: center;
+}
+
+.loadMoreButton {
+  min-width: 190px;
+}
+
+.glossaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.62rem;
+}
+
+.glossaryCard {
+  border: 1px solid rgb(84 145 159 / 40%);
+  background:
+    linear-gradient(180deg, rgb(5 21 31 / 94%), rgb(4 15 23 / 95%));
+  box-shadow: inset 0 0 0 1px rgb(151 239 255 / 7%);
+  padding: 0.52rem;
+  min-height: 96px;
+  display: grid;
+  gap: 0.35rem;
+  outline: none;
+  transition: border-color 140ms ease, transform 140ms ease;
+}
+
+.glossaryCard:hover,
+.glossaryCard:focus-visible {
+  border-color: rgb(124 236 255 / 58%);
+  transform: translateY(-2px);
+}
+
+.glossaryHead {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.glossaryHead h3 {
+  margin: 0;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #d6ffff;
+}
+
+.glossaryIcon {
+  width: 20px;
+  height: 20px;
+  border: 1px solid rgb(104 186 199 / 45%);
+  background: rgb(7 30 40 / 88%);
+  display: grid;
+  place-items: center;
+  color: #6ef7dd;
+  font-size: 0.7rem;
+}
+
+.glossaryDefinition {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #9fc7d2;
+  line-height: 1.4;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(-3px);
+  transition: max-height 220ms ease, opacity 220ms ease, transform 220ms ease;
+}
+
+.glossaryCard:hover .glossaryDefinition,
+.glossaryCard:focus-visible .glossaryDefinition {
+  max-height: 150px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.guidePlaceholder {
+  border: 1px dashed rgb(96 165 177 / 48%);
+  background: linear-gradient(180deg, rgb(4 18 27 / 90%), rgb(3 13 20 / 92%));
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.guidePlaceholder p {
+  margin: 0;
+  color: #a9c9d2;
+  font-size: 0.78rem;
+  line-height: 1.48;
+}
+
+.lockBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ffd17d;
+  width: fit-content;
+  border: 1px solid rgb(177 132 57 / 54%);
+  background: rgb(51 34 11 / 68%);
+  padding: 0.18rem 0.34rem;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: rgb(0 8 12 / 70%);
+  display: grid;
+  place-items: center;
+  padding: 0.8rem;
+}
+
+.modal {
+  width: min(560px, 96vw);
+  max-height: min(90vh, 780px);
+  overflow: auto;
+  border: 1px solid rgb(97 174 188 / 58%);
+  background: linear-gradient(180deg, rgb(8 34 44 / 98%), rgb(4 17 25 / 98%));
+  box-shadow:
+    inset 0 1px 0 rgb(151 241 255 / 14%),
+    0 14px 28px rgb(0 0 0 / 56%);
+  display: grid;
+}
+
+.modalHeader {
+  border-bottom: 1px solid rgb(81 139 151 / 40%);
+  padding: 0.55rem 0.65rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modalHeader h3 {
+  margin: 0;
+  font-size: 0.86rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #d9fffc;
+}
+
+.modalCloseButton {
+  appearance: none;
+  border: 1px solid rgb(101 141 153 / 50%);
+  background: rgb(11 37 48 / 92%);
+  color: #c7f8ff;
+  font: inherit;
+  width: 31px;
+  height: 31px;
+  cursor: pointer;
+}
+
+.modalBody {
+  padding: 0.62rem;
+  display: grid;
+  gap: 0.58rem;
+}
+
+.fieldLabel {
+  display: grid;
+  gap: 0.32rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.07em;
+  color: #accfd7;
+  text-transform: uppercase;
+}
+
+.fileInput,
+.captionInput {
+  width: 100%;
+  border: 1px solid rgb(85 148 161 / 52%);
+  background: rgb(4 17 25 / 90%);
+  color: #ddfdf8;
+  font: inherit;
+}
+
+.fileInput {
+  padding: 0.4rem;
+}
+
+.hiddenFileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fileDropzone {
+  position: relative;
+  display: grid;
+  gap: 0.34rem;
+  padding: 0.72rem;
+  border: 1px dashed rgb(95 183 196 / 58%);
+  background:
+    linear-gradient(180deg, rgb(5 21 30 / 92%), rgb(3 13 20 / 94%));
+  color: #d8fdf7;
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.fileDropzone:hover,
+.fileDropzone:focus-visible,
+.fileDropzoneActive {
+  border-color: rgb(125 249 230 / 78%);
+  box-shadow:
+    inset 0 0 0 1px rgb(134 255 236 / 14%),
+    0 0 16px rgb(87 255 223 / 16%);
+  transform: translateY(-1px);
+}
+
+.fileDropHint {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: none;
+}
+
+.fileDropMeta {
+  font-size: 0.64rem;
+  letter-spacing: 0.05em;
+  text-transform: none;
+  color: #8eb8c3;
+}
+
+.captionInput {
+  padding: 0.48rem;
+  resize: vertical;
+  min-height: 82px;
+}
+
+.previewWrap {
+  border: 1px solid rgb(82 135 146 / 44%);
+  background: rgb(5 16 24 / 88%);
+  padding: 0.4rem;
+}
+
+.previewImage {
+  width: 100%;
+  display: block;
+  max-height: 280px;
+  object-fit: contain;
+}
+
+.submitError {
+  margin: 0;
+  color: #ffa9b6;
+  font-size: 0.71rem;
+}
+
+.modalFooter {
+  border-top: 1px solid rgb(81 139 151 / 40%);
+  padding: 0.55rem 0.65rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.submitButton {
+  appearance: none;
+  border: 1px solid rgb(106 198 188 / 62%);
+  background: linear-gradient(180deg, rgb(14 63 62 / 95%), rgb(7 34 33 / 96%));
+  color: #bafef2;
+  font: inherit;
+  font-size: 0.73rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  padding: 0.4rem 0.72rem;
+  cursor: pointer;
+}
+
+.submitButton:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+@keyframes blobDrift {
+  0%,
+  100% {
+    transform: rotate(45deg) translateY(0);
+    opacity: 0.32;
+  }
+  50% {
+    transform: rotate(45deg) translateY(-11px);
+    opacity: 0.56;
+  }
+}
+
+@media (max-width: 900px) {
+  .libraryColumns {
+    grid-template-columns: 1fr;
+  }
+
+  .sideColumn {
+    gap: 0.8rem;
+  }
+
+  .sectionHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .addMemeButton {
+    width: 100%;
+  }
+
+  .memeWall {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .glossaryDefinition {
+    max-height: 170px;
+    opacity: 1;
+    transform: none;
+  }
+}

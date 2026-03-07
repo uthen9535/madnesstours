@@ -10,6 +10,7 @@ const ARM_SEQUENCE = ["green", "yellow", "red"] as const;
 const HISTOGRAM_BAR_COUNT = 100;
 const OFFLINE_THREAT_TEXT = "ACTIVE THREAT DETECTION: UNAUTHORIZED INTERACTION WILL INITIATE SECURITY RESPONSE.";
 type ArmColor = (typeof ARM_SEQUENCE)[number];
+const TRANSIENT_LOGIN_RETRIES = 3;
 
 export function StagingAccessTerminal() {
   const [codename, setCodename] = useState("");
@@ -202,43 +203,65 @@ export function StagingAccessTerminal() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({
-          username,
-          pin
-        })
-      });
+      let lastErrorMessage = "Invalid codename or PIN.";
 
-      if (!response.ok) {
-        let message = "Invalid codename or PIN.";
+      for (let attempt = 1; attempt <= TRANSIENT_LOGIN_RETRIES; attempt += 1) {
+        const response = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            username,
+            pin
+          })
+        });
+
+        if (!response.ok) {
+          let message = "Invalid codename or PIN.";
+          try {
+            const json = (await response.json()) as { error?: string };
+            if (json?.error) {
+              message = json.error;
+            }
+          } catch {
+            // Use default message.
+          }
+
+          lastErrorMessage = message;
+
+          const retryAfterHeader = Number(response.headers.get("retry-after") ?? "");
+          const retryAfterMs = Number.isFinite(retryAfterHeader) ? Math.max(0, retryAfterHeader) * 1000 : 0;
+          const isRetryable = response.status === 503 || response.status === 504 || /temporarily unavailable/i.test(message);
+          if (isRetryable && attempt < TRANSIENT_LOGIN_RETRIES) {
+            setLoginError(`Re-establishing secure channel (${attempt}/${TRANSIENT_LOGIN_RETRIES - 1})...`);
+            const fallbackWaitMs = 600 * attempt;
+            await new Promise<void>((resolve) => {
+              window.setTimeout(resolve, Math.max(retryAfterMs, fallbackWaitMs));
+            });
+            continue;
+          }
+
+          setLoginError(message);
+          return;
+        }
+
+        let redirectTo = "/home";
         try {
-          const json = (await response.json()) as { error?: string };
-          if (json?.error) {
-            message = json.error;
+          const json = (await response.json()) as { redirectTo?: string };
+          if (json?.redirectTo) {
+            redirectTo = json.redirectTo;
           }
         } catch {
-          // Use default message.
+          // Fall back to the default destination when the response body is empty/non-JSON.
         }
-        setLoginError(message);
+
+        // Force a full navigation so session cookies are always applied before loading protected routes.
+        window.location.assign(redirectTo);
         return;
       }
 
-      let redirectTo = "/home";
-      try {
-        const json = (await response.json()) as { redirectTo?: string };
-        if (json?.redirectTo) {
-          redirectTo = json.redirectTo;
-        }
-      } catch {
-        // Fall back to the default destination when the response body is empty/non-JSON.
-      }
-
-      // Force a full navigation so session cookies are always applied before loading protected routes.
-      window.location.assign(redirectTo);
+      setLoginError(lastErrorMessage);
     } catch {
       setLoginError("Service temporarily unavailable.");
     } finally {

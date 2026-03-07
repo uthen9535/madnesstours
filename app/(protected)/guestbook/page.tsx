@@ -7,9 +7,11 @@ import { ProfileLink } from "@/components/ProfileLink";
 import { RetroWindow } from "@/components/RetroWindow";
 import { requireUser } from "@/lib/auth";
 import { formatEthUnitsFromBase } from "@/lib/ethPurse";
-import { WIRED_WINDOW_MS } from "@/lib/operatorDashboard";
+import { formatSurfacedLabel, WIRED_WINDOW_MS } from "@/lib/operatorDashboard";
+import { buildPunchCountsByUserId, formatPunchCounts } from "@/lib/punchCounts";
 import { prisma } from "@/lib/prisma";
 import { formatBtcUnitsFromSats } from "@/lib/satoshi";
+import { withSqliteRetry } from "@/lib/sqliteRetry";
 
 function toStatusLabel(status: UserStatus): string {
   switch (status) {
@@ -27,40 +29,56 @@ function toStatusLabel(status: UserStatus): string {
 async function updateOwnStatus(formData: FormData) {
   "use server";
 
-  const user = await requireUser();
-  const nextStatus = String(formData.get("status") ?? "").trim();
+  try {
+    const user = await requireUser();
+    const nextStatus = String(formData.get("status") ?? "").trim();
 
-  if (!Object.values(UserStatus).includes(nextStatus as UserStatus)) {
-    return;
+    if (!Object.values(UserStatus).includes(nextStatus as UserStatus)) {
+      return;
+    }
+
+    await withSqliteRetry(() =>
+      prisma.user.update({
+        where: { id: user.id },
+        data: { status: nextStatus as UserStatus }
+      })
+    );
+
+    revalidatePath("/guestbook");
+    revalidatePath("/home");
+    revalidatePath(`/profiles/${user.username.toLowerCase()}`);
+  } catch (error) {
+    console.error("guestbook status update failed", error);
   }
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { status: nextStatus as UserStatus }
-  });
-
-  revalidatePath("/guestbook");
 }
 
 async function updateOwnOperations(formData: FormData) {
   "use server";
 
-  const user = await requireUser();
-  const operations = String(formData.get("operations") ?? "").trim().slice(0, 120);
+  try {
+    const user = await requireUser();
+    const operations = String(formData.get("operations") ?? "").trim().slice(0, 120);
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { operations }
-  });
+    await withSqliteRetry(() =>
+      prisma.user.update({
+        where: { id: user.id },
+        data: { operations }
+      })
+    );
 
-  revalidatePath("/guestbook");
+    revalidatePath("/guestbook");
+    revalidatePath("/home");
+    revalidatePath(`/profiles/${user.username.toLowerCase()}`);
+  } catch (error) {
+    console.error("guestbook operations update failed", error);
+  }
 }
 
 export default async function GuestbookPage() {
   const user = await requireUser();
   const isAdmin = user.role === Role.admin;
 
-  const [members, attendedTrips, stamps, ownPinRecord] = await Promise.all([
+  const [members, tripLogPunchEntries, madnessPunches, ownPinRecord] = await Promise.all([
     isAdmin
       ? prisma.user.findMany({
           orderBy: { createdAt: "asc" },
@@ -94,13 +112,17 @@ export default async function GuestbookPage() {
       where: { tripId: { not: null } },
       select: {
         userId: true,
+        tripId: true,
+        message: true
+      },
+      orderBy: { createdAt: "asc" }
+    }),
+    prisma.tripStamp.findMany({
+      select: {
+        userId: true,
         tripId: true
       },
       distinct: ["userId", "tripId"]
-    }),
-    prisma.tripStamp.groupBy({
-      by: ["userId"],
-      _count: { _all: true }
     }),
     isAdmin
       ? Promise.resolve(null)
@@ -111,15 +133,11 @@ export default async function GuestbookPage() {
   ]);
 
   const nowMs = Date.now();
-  const punchesByUserId = new Map<string, number>();
-  for (const entry of attendedTrips) {
-    punchesByUserId.set(entry.userId, (punchesByUserId.get(entry.userId) ?? 0) + 1);
-  }
-  const stampsByUserId = new Map(stamps.map((entry) => [entry.userId, entry._count._all]));
+  const punchCountsByUserId = buildPunchCountsByUserId(madnessPunches, tripLogPunchEntries);
 
   return (
     <div className="stack">
-      <ChatAutoRefresh intervalMs={5000} pauseWhileTypingSelector=".guestbook-pin-manager" />
+      <ChatAutoRefresh intervalMs={5000} pauseWhileTypingSelector=".database-table-wrap, .guestbook-pin-manager" />
       <RetroWindow title="Guestbook: Member Database">
         <p className="meta">Columns are live-refreshed every 5 seconds. Wired = wilco when operator is currently online.</p>
         <div className="database-table-wrap">
@@ -133,6 +151,7 @@ export default async function GuestbookPage() {
                 <th>purse</th>
                 <th>wired</th>
                 <th>agent condition</th>
+                <th>surfaced</th>
                 <th className={isAdmin ? "database-table__pin-header" : undefined}>pin</th>
               </tr>
             </thead>
@@ -141,14 +160,15 @@ export default async function GuestbookPage() {
                 const adminMember = member as typeof member & { pin?: string; pinResetComplete?: boolean };
                 const wired =
                   member.lastSeenAt && nowMs - member.lastSeenAt.getTime() <= WIRED_WINDOW_MS ? "wilco" : "negative";
+                const surfaced = formatSurfacedLabel(member.lastSeenAt ?? null);
 
                 return (
                   <tr key={member.id}>
                     <td>
                       <ProfileLink username={member.username} />
                     </td>
-                    <td>{punchesByUserId.get(member.id) ?? 0}</td>
-                    <td>{stampsByUserId.get(member.id) ?? 0}</td>
+                    <td>{formatPunchCounts(punchCountsByUserId.get(member.id)?.mad ?? 0, punchCountsByUserId.get(member.id)?.may ?? 0)}</td>
+                    <td>0</td>
                     <td>
                       {member.id === user.id ? (
                         <form action={updateOwnOperations} className="operations-inline-form">
@@ -195,6 +215,7 @@ export default async function GuestbookPage() {
                         toStatusLabel(member.status)
                       )}
                     </td>
+                    <td>{surfaced}</td>
                     <td className={isAdmin ? "database-table__pin-cell" : undefined}>
                       <GuestbookPinControl
                         memberId={member.id}

@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser, hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { withSqliteRetry } from "@/lib/sqliteRetry";
 
 const pinResetSchema = z.object({
   pin: z.string().regex(/^\d{6}$/),
@@ -28,14 +29,16 @@ export async function POST(request: Request) {
     }
 
     const passwordHash = await hashPassword(pin);
-    const result = await prisma.user.updateMany({
-      where: { id: user.id },
-      data: {
-        passwordHash,
-        pin,
-        pinResetComplete: true
-      }
-    });
+    const result = await withSqliteRetry(() =>
+      prisma.user.updateMany({
+        where: { id: user.id },
+        data: {
+          passwordHash,
+          pin,
+          pinResetComplete: true
+        }
+      })
+    );
     if (result.count === 0) {
       return NextResponse.json({ error: "Unable to update PIN right now" }, { status: 500 });
     }

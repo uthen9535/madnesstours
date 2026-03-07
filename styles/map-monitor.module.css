@@ -1,0 +1,1101 @@
+.scene {
+  position: relative;
+  min-height: clamp(496px, 63vh, 684px);
+  border: 2px solid rgb(62 109 126 / 52%);
+  overflow: visible;
+  background: rgb(3 11 18);
+}
+
+.backgroundLayer {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 18%, rgb(64 136 154 / 18%), transparent 46%),
+    linear-gradient(180deg, rgb(3 18 31 / 85%), rgb(2 10 16 / 92%));
+}
+
+.backgroundShade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgb(0 0 0 / 8%), rgb(0 0 0 / 42%)),
+    repeating-linear-gradient(90deg, rgb(120 240 255 / 3%) 0, rgb(120 240 255 / 3%) 1px, transparent 1px, transparent 32px);
+  pointer-events: none;
+}
+
+.overlayLayer {
+  position: relative;
+  z-index: 2;
+  min-height: 100%;
+  padding: clamp(0.62rem, 1.35vw, 1rem);
+  display: grid;
+  gap: 0.68rem;
+  align-content: center;
+  justify-items: center;
+  overflow: visible;
+}
+
+.monitor {
+  position: relative;
+  width: min(100%, 1020px);
+  border: 2px solid rgb(105 116 124 / 62%);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgb(41 46 52 / 96%), rgb(20 23 28 / 98%));
+  box-shadow:
+    inset 0 2px 0 rgb(180 193 201 / 16%),
+    inset 0 -5px 0 rgb(0 0 0 / 62%),
+    0 16px 36px rgb(0 0 0 / 52%);
+  min-height: clamp(258px, 33vh, 376px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: visible;
+}
+
+.monitorHeader {
+  border-bottom: 1px solid rgb(128 146 156 / 44%);
+  background:
+    linear-gradient(90deg, rgb(22 29 37 / 96%), rgb(44 49 56 / 98%), rgb(20 28 36 / 96%));
+  padding: 0.44rem 0.62rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.monitorHeaderLeft,
+.monitorHeaderRight {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.46rem;
+  min-width: 0;
+}
+
+.monitorTitle {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #deedf3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.monitorStatus,
+.monitorCode {
+  font-size: 0.6rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: #afc4cc;
+}
+
+.monitorLed {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #4c5a62;
+  box-shadow: 0 0 0 1px rgb(12 27 36 / 86%);
+}
+
+.monitorLedOn {
+  background: #f0ff84;
+  box-shadow:
+    0 0 0 1px rgb(31 33 12 / 86%),
+    0 0 9px rgb(253 255 144 / 82%);
+  animation: monitor-led-pulse 1.5s ease-in-out infinite;
+}
+
+.monitorBody {
+  position: relative;
+  z-index: 2;
+  padding: 0.42rem;
+  min-height: 0;
+  height: clamp(420px, 62vh, 580px);
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) 248px;
+  gap: 0.36rem;
+  overflow: visible;
+}
+
+.monitorScrews {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.monitorScrews i {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid rgb(100 125 133 / 65%);
+  background: rgb(26 39 46 / 94%);
+  box-shadow: inset 0 0 0 1px rgb(6 13 18 / 72%);
+}
+
+.monitorScrews i:nth-child(1) {
+  left: 0.55rem;
+  top: 0.55rem;
+}
+
+.monitorScrews i:nth-child(2) {
+  right: 0.55rem;
+  top: 0.55rem;
+}
+
+.monitorScrews i:nth-child(3) {
+  left: 0.55rem;
+  bottom: 0.55rem;
+}
+
+.monitorScrews i:nth-child(4) {
+  right: 0.55rem;
+  bottom: 0.55rem;
+}
+
+.monitorSideRailLeft {
+  border: 1px solid rgb(112 126 136 / 50%);
+  background: linear-gradient(180deg, rgb(22 28 35 / 94%), rgb(11 17 23 / 95%));
+  display: grid;
+  gap: 0.24rem;
+  padding: 0.24rem;
+}
+
+.monitorSideRailLeft span {
+  border: 1px solid rgb(117 131 141 / 46%);
+  background: rgb(9 14 20 / 88%);
+  min-height: 18px;
+}
+
+.monitorScreenShell {
+  position: relative;
+  border: 1px solid rgb(117 129 138 / 54%);
+  border-radius: 30px 30px 42px 42px / 22px 22px 34px 34px;
+  background:
+    radial-gradient(circle at 50% 18%, rgb(60 82 96 / 35%), transparent 58%),
+    linear-gradient(180deg, rgb(20 28 36 / 97%), rgb(9 14 21 / 97%));
+  padding: 0.45rem;
+  box-shadow:
+    inset 0 2px 0 rgb(198 214 224 / 12%),
+    inset 0 -4px 0 rgb(0 0 0 / 72%),
+    0 10px 20px rgb(0 0 0 / 44%);
+  min-height: 0;
+  height: 100%;
+  display: grid;
+}
+
+.monitorScreenGlow {
+  position: absolute;
+  inset: 0.52rem;
+  border-radius: 22px;
+  pointer-events: none;
+  box-shadow: inset 0 0 20px rgb(88 222 239 / 16%);
+}
+
+.monitorScreen {
+  position: relative;
+  border: 1px solid rgb(53 78 89 / 90%);
+  border-radius: 22px;
+  box-shadow: inset 0 0 0 1px rgb(122 180 193 / 10%);
+  background: rgb(2 12 19 / 95%);
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  overflow: hidden;
+}
+
+.monitorScreenOff {
+  filter: saturate(0.68) brightness(0.68);
+  box-shadow:
+    inset 0 0 0 1px rgb(145 237 255 / 4%),
+    0 0 9px rgb(35 80 92 / 12%);
+}
+
+.monitorScreenFrameMarks {
+  position: absolute;
+  inset-inline: 1rem;
+  bottom: 0.42rem;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  font-size: 0.51rem;
+  letter-spacing: 0.16em;
+  color: rgb(129 154 166 / 74%);
+}
+
+.monitorRightRail {
+  min-height: 0;
+  position: relative;
+  z-index: 3;
+}
+
+.monitorStatusPod {
+  position: absolute;
+  top: 22%;
+  height: 50%;
+  right: clamp(-150px, -12.5vw, -110px);
+  width: 198px;
+  max-width: min(198px, calc(100% - 1rem));
+  border: 2px solid rgb(105 116 124 / 62%);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgb(41 46 52 / 96%), rgb(20 23 28 / 98%));
+  box-shadow:
+    inset 0 2px 0 rgb(180 193 201 / 16%),
+    inset 0 -3px 0 rgb(0 0 0 / 68%),
+    0 14px 20px rgb(0 0 0 / 42%);
+  padding: 0.46rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  opacity: 0;
+  transform: translateX(-82%);
+  transition: transform 380ms ease, opacity 260ms ease, box-shadow 300ms ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.monitorStatusPodActive {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+  box-shadow:
+    inset 0 2px 0 rgb(188 207 219 / 18%),
+    inset 0 -3px 0 rgb(0 0 0 / 68%),
+    0 14px 20px rgb(0 0 0 / 42%),
+    0 0 16px rgb(123 248 255 / 20%);
+}
+
+.monitorStatusPodHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  min-width: 0;
+  padding-left: 2.35rem;
+}
+
+.monitorStatusPodClose {
+  appearance: none;
+  border: 1px solid rgb(155 181 193 / 52%);
+  background: linear-gradient(180deg, rgb(52 61 72 / 96%), rgb(20 26 34 / 96%));
+  color: #d5e7ef;
+  font: inherit;
+  font-size: 0.48rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.28rem;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgb(238 248 255 / 14%),
+    inset 0 -1px 0 rgb(0 0 0 / 58%);
+}
+
+.monitorStatusPodClose:hover {
+  border-color: rgb(135 219 233 / 64%);
+  color: #b4f5ff;
+}
+
+.monitorStatusPodLabel {
+  margin: 0;
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #95ccda;
+  padding-left: 0.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.monitorStatusPodMessage {
+  margin: 0;
+  border: 1px solid rgb(88 132 145 / 44%);
+  background: rgb(6 17 25 / 92%);
+  min-height: 96px;
+  flex: 1;
+  padding: 0.34rem 0.38rem 0.34rem 2.35rem;
+  font-size: 0.54rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #aef7ff;
+  line-height: 1.5;
+  text-align: left;
+  white-space: pre-line;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  overflow-y: auto;
+}
+
+.monitorMap {
+  width: 100%;
+  height: 100%;
+  min-height: clamp(168px, 23vh, 232px);
+  min-width: 0;
+}
+
+.monitorMap :global(.google-map-shell) {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.monitorMap :global(.google-map-canvas) {
+  height: 100% !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: linear-gradient(180deg, #071528 0, #020617 100%);
+  overflow: auto !important;
+}
+
+.monitorMap :global(.retro-map-stage) {
+  min-width: 100%;
+  height: auto !important;
+  min-height: 0 !important;
+  aspect-ratio: 1000 / 416;
+}
+
+.monitorMap :global(.retro-map-canvas) {
+  padding: 0 !important;
+  background-image: none !important;
+  scrollbar-gutter: auto !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.monitorMap :global(.retro-map-canvas::-webkit-scrollbar) {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.monitorMap :global(.retro-map-svg) {
+  border: 0;
+  box-shadow: none;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.monitorVent {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.84rem;
+  display: inline-flex;
+  gap: 0.2rem;
+}
+
+.monitorVent span {
+  width: 10px;
+  height: 5px;
+  border: 1px solid rgb(104 117 126 / 58%);
+  background: rgb(5 20 28 / 92%);
+}
+
+.controlPanel {
+  height: 100%;
+  border: 1px solid rgb(130 142 150 / 48%);
+  background:
+    linear-gradient(180deg, rgb(31 35 42 / 96%), rgb(15 18 24 / 97%));
+  box-shadow:
+    inset 0 1px 0 rgb(191 202 214 / 14%),
+    inset 0 -2px 0 rgb(0 0 0 / 72%);
+  padding: 0.5rem;
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.controlNameplate {
+  border: 1px solid rgb(151 133 82 / 54%);
+  background: linear-gradient(180deg, rgb(72 64 34 / 95%), rgb(46 38 18 / 95%));
+  color: #eedca1;
+  font-size: 0.56rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.28rem 0.34rem;
+}
+
+.controlPanelGroup {
+  border: 1px solid rgb(112 125 136 / 42%);
+  background: rgb(9 14 22 / 88%);
+  padding: 0.36rem;
+  display: grid;
+  gap: 0.34rem;
+}
+
+.controlGroupLabel {
+  margin: 0;
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #d2dbe2;
+}
+
+.powerButton {
+  appearance: none;
+  border: 1px solid rgb(153 171 184 / 58%);
+  background: linear-gradient(180deg, rgb(57 63 71 / 95%), rgb(26 31 39 / 96%));
+  color: #f4f9ff;
+  font: inherit;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.36rem 0.54rem;
+  display: inline-flex;
+  gap: 0.34rem;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  min-height: 34px;
+  box-shadow:
+    inset 0 1px 0 rgb(224 237 248 / 20%),
+    inset 0 -2px 0 rgb(0 0 0 / 62%);
+}
+
+.powerButton:disabled {
+  opacity: 0.62;
+  cursor: wait;
+}
+
+.powerButtonOn {
+  border-color: rgb(160 247 229 / 62%);
+  box-shadow:
+    inset 0 1px 0 rgb(224 255 248 / 24%),
+    inset 0 -2px 0 rgb(0 0 0 / 62%),
+    0 0 12px rgb(128 248 227 / 34%);
+}
+
+.powerButtonLed {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #606975;
+}
+
+.powerButtonOn .powerButtonLed {
+  background: #f7ff9e;
+  box-shadow: 0 0 9px rgb(247 255 158 / 76%);
+}
+
+.switchRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.32rem;
+}
+
+.sliderSwitch {
+  appearance: none;
+  border: 1px solid rgb(125 139 151 / 46%);
+  background: linear-gradient(180deg, rgb(41 49 59 / 96%), rgb(20 26 34 / 96%));
+  color: #a8b6c1;
+  font: inherit;
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.22rem 0.12rem;
+}
+
+.zoomRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: 0.24rem;
+  align-items: center;
+}
+
+.zoomButton {
+  appearance: none;
+  border: 1px solid rgb(122 140 152 / 50%);
+  background: linear-gradient(180deg, rgb(45 52 61 / 96%), rgb(19 25 33 / 96%));
+  color: #d9e8f4;
+  font: inherit;
+  font-size: 0.58rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  padding: 0.32rem 0.15rem;
+  cursor: pointer;
+}
+
+.zoomButton:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+
+.zoomReadout {
+  border: 1px solid rgb(92 125 136 / 44%);
+  background: rgb(7 13 20 / 92%);
+  color: #98becd;
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.24rem 0.34rem;
+}
+
+.majorButtonWrap {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.targetPrimaryButton {
+  appearance: none;
+  border: 1px solid rgb(176 147 74 / 56%);
+  background:
+    linear-gradient(180deg, rgb(114 78 24 / 96%), rgb(74 49 12 / 97%));
+  color: #ffe3a8;
+  text-shadow: 0 0 10px rgb(255 232 162 / 24%);
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.4rem;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgb(255 238 182 / 24%),
+    inset 0 -2px 0 rgb(0 0 0 / 56%);
+}
+
+.targetPrimaryButton:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.targetPrimaryButton:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.targetPrimaryButton:disabled {
+  opacity: 0.44;
+  cursor: not-allowed;
+}
+
+.targetPrimaryButtonActive {
+  box-shadow:
+    inset 0 1px 0 rgb(255 238 182 / 24%),
+    inset 0 -2px 0 rgb(0 0 0 / 56%),
+    0 0 13px rgb(255 198 91 / 34%);
+  animation: target-arm-pulse 1.9s steps(2, end) infinite;
+}
+
+.targetPrimaryLabel {
+  font-size: 0.55rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #d9cab0;
+  text-align: center;
+}
+
+.directionalPad {
+  border: 1px solid rgb(111 126 136 / 42%);
+  background: rgb(6 12 18 / 94%);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 0.14rem;
+  padding: 0.18rem;
+  min-height: 51px;
+}
+
+.directionalButton {
+  appearance: none;
+  border: 1px solid rgb(118 132 142 / 44%);
+  background: linear-gradient(180deg, rgb(43 50 58 / 95%), rgb(20 26 34 / 95%));
+  color: #dce9f3;
+  font: inherit;
+  font-size: 0.6rem;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgb(225 239 253 / 18%),
+    inset 0 -2px 0 rgb(0 0 0 / 52%);
+}
+
+.directionalButton:hover:not(:disabled) {
+  border-color: rgb(141 206 220 / 58%);
+  color: #b2f4ff;
+  box-shadow:
+    inset 0 1px 0 rgb(223 255 255 / 22%),
+    inset 0 -2px 0 rgb(0 0 0 / 52%),
+    0 0 9px rgb(103 240 255 / 22%);
+}
+
+.directionalButton:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.directionalButton:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.directionalUp {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.directionalLeft {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.directionalRight {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.directionalDown {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.telemetryStrip {
+  border: 1px solid rgb(87 102 112 / 44%);
+  background: rgb(5 10 16 / 92%);
+  padding: 0.3rem 0.35rem;
+  display: grid;
+  gap: 0.18rem;
+  font-size: 0.54rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #93a7b5;
+}
+
+.commsGrill {
+  border: 1px solid rgb(86 100 110 / 48%);
+  background: linear-gradient(180deg, rgb(6 12 18 / 95%), rgb(3 7 12 / 96%));
+  padding: 0.28rem;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 0.2rem;
+}
+
+.commsGrill i {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  background: rgb(19 33 44 / 92%);
+  box-shadow: inset 0 1px 0 rgb(128 156 173 / 16%);
+}
+
+.executeRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.32rem;
+}
+
+.confirmButton,
+.clearButton {
+  appearance: none;
+  font: inherit;
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.32rem 0.2rem;
+  border: 1px solid rgb(121 133 144 / 48%);
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgb(221 234 245 / 20%),
+    inset 0 -2px 0 rgb(0 0 0 / 56%);
+}
+
+.confirmButton {
+  background: linear-gradient(180deg, rgb(21 77 74 / 96%), rgb(7 32 31 / 97%));
+  color: #c9fff7;
+  border-color: rgb(114 228 214 / 58%);
+  min-height: 42px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  box-shadow:
+    inset 0 1px 0 rgb(219 255 247 / 23%),
+    inset 0 -3px 0 rgb(0 0 0 / 62%),
+    0 0 12px rgb(109 255 232 / 16%);
+}
+
+.confirmButtonHot {
+  border-color: rgb(126 255 236 / 70%);
+  box-shadow:
+    inset 0 1px 0 rgb(219 255 247 / 23%),
+    inset 0 -3px 0 rgb(0 0 0 / 62%),
+    0 0 16px rgb(109 255 232 / 34%);
+  animation: confirm-hot-pulse 1.2s ease-in-out infinite;
+}
+
+.clearButton {
+  background: linear-gradient(180deg, rgb(65 40 40 / 96%), rgb(34 20 20 / 96%));
+  color: #ffc4c4;
+  border-color: rgb(188 105 105 / 52%);
+  min-height: 32px;
+}
+
+.confirmButton:disabled,
+.clearButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.rotaryRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.3rem;
+}
+
+.rotaryKnob {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid rgb(118 132 142 / 52%);
+  background:
+    radial-gradient(circle at 30% 26%, rgb(145 164 178 / 45%), transparent 32%),
+    radial-gradient(circle at 58% 65%, rgb(28 37 47 / 94%), rgb(8 12 18 / 97%));
+  box-shadow:
+    inset 0 1px 0 rgb(212 225 236 / 20%),
+    inset 0 -2px 0 rgb(0 0 0 / 62%);
+}
+
+.screenMask {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  pointer-events: none;
+}
+
+.screenMask p {
+  margin: 0;
+}
+
+.screenMaskOff {
+  background:
+    radial-gradient(circle at 50% 50%, rgb(22 36 46 / 35%) 0, rgb(3 6 10 / 98%) 65%);
+  color: #6df7b5;
+}
+
+.standbyLed {
+  position: absolute;
+  right: 1.05rem;
+  top: 1.05rem;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #d4a04f;
+  box-shadow: 0 0 8px rgb(212 160 79 / 74%);
+  animation: standby-blink 1.8s ease-in-out infinite;
+}
+
+.standbyTerminal {
+  display: grid;
+  gap: 0.28rem;
+  width: min(92%, 740px);
+  margin: 0 auto;
+  justify-items: start;
+  text-align: left;
+}
+
+.standbyPrompt,
+.standbyTypedLine,
+.standbySubline {
+  margin: 0;
+  text-transform: none;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  color: #71ffbc;
+  text-shadow: 0 0 8px rgb(85 255 180 / 32%);
+}
+
+.standbyPrompt {
+  opacity: 0.88;
+}
+
+.standbyTypedLine {
+  min-height: 1.15em;
+}
+
+.standbySubline {
+  font-size: 0.58rem;
+  opacity: 0.78;
+}
+
+.standbyCaret {
+  display: inline-block;
+  margin-left: 0.08rem;
+  color: #9bffd2;
+  animation: standby-caret-blink 0.9s steps(1, end) infinite;
+}
+
+.screenMaskBooting {
+  color: #9ce9f5;
+  background: rgb(1 8 14 / 62%);
+}
+
+.bootFlash {
+  position: absolute;
+  inset: 0;
+  background: rgb(157 248 255 / 9%);
+  animation: boot-flash 1.3s ease-out forwards;
+}
+
+.bootSweep {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 28%;
+  background: linear-gradient(180deg, transparent, rgb(138 246 255 / 32%), transparent);
+  animation: boot-sweep 1.3s ease-out forwards;
+}
+
+.screenMaskShutdown {
+  background: rgb(1 5 8 / 68%);
+}
+
+.shutdownLine {
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgb(140 232 241 / 74%), transparent);
+  animation: shutdown-collapse 0.42s ease-out forwards;
+}
+
+.sceneHint {
+  margin: 0;
+  font-size: 0.68rem;
+  color: #8fb7c2;
+  letter-spacing: 0.05em;
+  width: min(100%, 1080px);
+}
+
+.targetModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgb(0 0 0 / 48%);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.targetModal {
+  width: min(560px, 96vw);
+  border: 1px solid rgb(108 160 176 / 52%);
+  background:
+    linear-gradient(180deg, rgb(9 27 38 / 98%), rgb(5 14 22 / 98%));
+  box-shadow:
+    inset 0 1px 0 rgb(170 245 255 / 14%),
+    0 18px 32px rgb(0 0 0 / 56%);
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.52rem;
+}
+
+.targetModalTitle {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #baf6ff;
+}
+
+.targetModalCopy {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: #c4dce4;
+}
+
+.targetModalCoords {
+  margin: 0;
+  border: 1px solid rgb(94 136 151 / 38%);
+  background: rgb(6 19 28 / 88%);
+  padding: 0.35rem 0.42rem;
+  font-size: 0.67rem;
+  letter-spacing: 0.1em;
+  color: #97c8d4;
+}
+
+.targetModalActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.targetModalPrimary,
+.targetModalSecondary {
+  appearance: none;
+  border: 1px solid rgb(94 147 162 / 52%);
+  background: linear-gradient(180deg, rgb(12 41 55 / 95%), rgb(6 21 31 / 96%));
+  color: #c9f8ff;
+  font: inherit;
+  font-size: 0.67rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  padding: 0.34rem 0.55rem;
+  cursor: pointer;
+}
+
+.targetModalPrimary {
+  border-color: rgb(92 188 178 / 56%);
+  color: #bafff1;
+}
+
+.targetModalSecondary {
+  border-color: rgb(166 182 191 / 48%);
+  color: #d4e1e8;
+  background: linear-gradient(180deg, rgb(43 52 62 / 95%), rgb(18 24 32 / 96%));
+}
+
+@keyframes monitor-led-pulse {
+  0%,
+  100% {
+    opacity: 0.76;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes standby-blink {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+@keyframes standby-caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  46%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes boot-sweep {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(360%);
+    opacity: 0;
+  }
+}
+
+@keyframes boot-flash {
+  0% {
+    opacity: 0;
+  }
+  28% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes shutdown-collapse {
+  from {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  to {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+}
+
+@keyframes target-arm-pulse {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 1px 0 rgb(255 238 182 / 24%),
+      inset 0 -2px 0 rgb(0 0 0 / 56%),
+      0 0 10px rgb(255 198 91 / 20%);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgb(255 238 182 / 24%),
+      inset 0 -2px 0 rgb(0 0 0 / 56%),
+      0 0 15px rgb(255 198 91 / 38%);
+  }
+}
+
+@keyframes confirm-hot-pulse {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 1px 0 rgb(219 255 247 / 23%),
+      inset 0 -3px 0 rgb(0 0 0 / 62%),
+      0 0 12px rgb(109 255 232 / 22%);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgb(219 255 247 / 23%),
+      inset 0 -3px 0 rgb(0 0 0 / 62%),
+      0 0 20px rgb(109 255 232 / 42%);
+  }
+}
+
+@keyframes status-pod-type {
+  0%,
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 0.94;
+  }
+  50% {
+    clip-path: inset(0 4% 0 0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 900px) {
+  .monitor {
+    width: 100%;
+  }
+
+  .monitorBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .monitorSideRailLeft {
+    display: none;
+  }
+
+  .monitorRightRail {
+    order: 2;
+  }
+
+  .monitorStatusPod {
+    display: none;
+  }
+}
+
+@media (max-width: 680px) {
+  .monitorHeader {
+    flex-wrap: wrap;
+  }
+
+  .monitorTitle {
+    max-width: 100%;
+  }
+
+  .monitorMap {
+    min-height: clamp(220px, 34vh, 320px);
+  }
+}

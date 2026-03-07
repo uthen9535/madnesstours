@@ -1,7 +1,16 @@
 import { UserStatus } from "@prisma/client";
+import { buildPunchCountsByUserId } from "@/lib/punchCounts";
 import { prisma } from "@/lib/prisma";
 
 export const WIRED_WINDOW_MS = 120_000;
+
+export function formatSurfacedLabel(lastSeenAt: Date | null): string {
+  if (!lastSeenAt) {
+    return "negative";
+  }
+
+  return lastSeenAt.toLocaleString();
+}
 
 export function getOperatorStatusLabel(status: UserStatus): string {
   switch (status) {
@@ -41,7 +50,9 @@ export type OperatorDashboardData = {
   ethUnits: number;
   liveChatMessages: number;
   travelStamps: number;
-  punches: number;
+  punchesMad: number;
+  punchesMay: number;
+  surfacedLabel: string;
 };
 
 export async function getOperatorDashboardData(userId: string): Promise<OperatorDashboardData | null> {
@@ -63,32 +74,35 @@ export async function getOperatorDashboardData(userId: string): Promise<Operator
     return null;
   }
 
-  const [liveChatMessages, travelStamps, punchesDistinctTrips] = await Promise.all([
+  const [liveChatMessages, madnessPunches, tripLogPunchEntries] = await Promise.all([
     prisma.guestbookEntry.count({
       where: {
         userId,
         tripId: null
       }
     }),
-    prisma.tripStamp.count({
-      where: { userId }
+    prisma.tripStamp.findMany({
+      where: { userId },
+      select: { userId: true, tripId: true },
+      distinct: ["userId", "tripId"]
     }),
     prisma.guestbookEntry.findMany({
       where: {
         userId,
         tripId: { not: null }
       },
-      select: { tripId: true },
-      distinct: ["tripId"]
+      select: { userId: true, tripId: true, message: true }
     })
   ]);
+
+  const userPunches = buildPunchCountsByUserId(madnessPunches, tripLogPunchEntries).get(userId) ?? { mad: 0, may: 0 };
 
   const wired = Boolean(user.lastSeenAt && Date.now() - user.lastSeenAt.getTime() <= WIRED_WINDOW_MS);
 
   return {
     id: user.id,
     username: user.username,
-    role: user.role,
+    role: user.role === "admin" ? "command" : user.role,
     statusLabel: getOperatorStatusLabel(user.status),
     wired,
     health: getOperatorHealth(user.status),
@@ -96,7 +110,9 @@ export async function getOperatorDashboardData(userId: string): Promise<Operator
     btcSats: user.btcSats,
     ethUnits: user.ethUnits,
     liveChatMessages,
-    travelStamps,
-    punches: punchesDistinctTrips.length
+    travelStamps: 0,
+    punchesMad: userPunches.mad,
+    punchesMay: userPunches.may,
+    surfacedLabel: formatSurfacedLabel(user.lastSeenAt)
   };
 }

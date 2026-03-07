@@ -180,6 +180,8 @@ export function SystemAttackFeed({ currentUsername }: SystemAttackFeedProps) {
     let typingTimer: number | null = null;
     let codeTypingTimer: number | null = null;
     let clearTimer: number | null = null;
+    // Do not replay historical attacks on refresh; only process events emitted after mount.
+    latestTsRef.current = Math.floor(Date.now() / 1000);
 
     const clearActiveTimers = () => {
       if (typingTimer !== null) {

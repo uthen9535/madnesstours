@@ -17,7 +17,9 @@ type EvidenceProfile = {
   ethUnits: number;
   liveChatMessages: number;
   travelStamps: number;
-  punches: number;
+  punchesMad: number;
+  punchesMay: number;
+  surfacedLabel: string;
 };
 
 type EvidenceNode = {

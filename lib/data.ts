@@ -1,4 +1,4 @@
-import { BlogCategory } from "@prisma/client";
+import { BlogCategory, TripMissionStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export const blogCategoryLabels: Record<BlogCategory, string> = {
@@ -59,6 +59,43 @@ export async function getPublishedTripBySlug(slug: string) {
   return prisma.trip.findFirst({
     where: { slug, published: true }
   });
+}
+
+export type NextMissionObjective = {
+  title: string;
+  startDate: Date;
+} | null;
+
+export async function getNextMissionObjective(): Promise<NextMissionObjective> {
+  try {
+    const now = new Date();
+    const next = await prisma.trip.findFirst({
+      where: {
+        published: true,
+        missionStatus: TripMissionStatus.MISSION_OBJECTIVE,
+        startDate: {
+          gte: now
+        }
+      },
+      orderBy: [{ startDate: "asc" }, { createdAt: "asc" }],
+      select: {
+        title: true,
+        startDate: true
+      }
+    });
+
+    if (!next) {
+      return null;
+    }
+
+    return {
+      title: next.title,
+      startDate: next.startDate
+    };
+  } catch (error) {
+    console.warn("Mission objective lookup failed.", error);
+    return null;
+  }
 }
 
 export async function getGuestbookMessages() {

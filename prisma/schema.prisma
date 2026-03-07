@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -32,6 +32,36 @@ enum MediaType {
   OTHER
 }
 
+enum MediaAssetKind {
+  IMAGE
+  GIF
+  VIDEO
+  OTHER
+}
+
+enum MediaAssetStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum MediaAssetScope {
+  TOUR
+  MEME
+  RELIC_VAULT
+  MEMBER_UPLOAD
+  OTHER
+}
+
+enum MediaUploadSessionStatus {
+  UPLOADING
+  PROCESSING
+  COMPLETE
+  FAILED
+  CANCELED
+}
+
 enum TripMissionStatus {
   MISSION_COMPLETE
   MISSION_OBJECTIVE
@@ -58,6 +88,8 @@ model User {
   tripsLogged    TripStamp[]
   mediaItems     MediaItem[]      @relation("MediaUploads")
   mediaApprovals MediaItem[]      @relation("MediaApprovals")
+  mediaAssets    MediaAsset[]     @relation("MediaAssetUploads")
+  mediaSessions  MediaUploadSession[]
   guestbook      GuestbookEntry[] @relation("GuestbookAuthor")
   satsSent       SatoshiDrop[]    @relation("SatoshiDropSender")
   satsReceived   SatoshiDrop[]    @relation("SatoshiDropReceiver")
@@ -112,6 +144,7 @@ model Trip {
   stamps        TripStamp[]
   guestbook     GuestbookEntry[]
   mediaItems    MediaItem[]
+  mediaAssets   MediaAsset[]
 }
 
 model TripStamp {
@@ -194,6 +227,103 @@ model MediaItem {
   @@index([tripId])
   @@index([approved])
   @@index([tripId, approved])
+}
+
+model MediaAsset {
+  id               String           @id @default(cuid())
+  scope            MediaAssetScope
+  scopeRef         String?
+  tripId           String?
+  tourSlug         String?
+  uploaderId       String
+  fileType         MediaAssetKind
+  status           MediaAssetStatus @default(UPLOADING)
+  title            String?
+  description      String?
+  originalFilename String
+  mimeType         String
+  fileSizeBytes    Int
+  storageKey       String
+  storageUrl       String
+  width            Int?
+  height           Int?
+  durationMs       Int?
+  errorMessage     String?
+  thumbnailKey     String?
+  thumbnailUrl     String?
+  cardKey          String?
+  cardUrl          String?
+  mediumKey        String?
+  mediumUrl        String?
+  largeKey         String?
+  largeUrl         String?
+  modalKey         String?
+  modalUrl         String?
+  fullKey          String?
+  fullUrl          String?
+  posterKey        String?
+  posterUrl        String?
+  previewKey       String?
+  previewUrl       String?
+  playbackKey      String?
+  playbackUrl      String?
+  derivatives      Json?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  processedAt      DateTime?
+  deletedAt        DateTime?
+  trip             Trip?            @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  uploader         User             @relation("MediaAssetUploads", fields: [uploaderId], references: [id], onDelete: Cascade)
+  uploadSession    MediaUploadSession?
+
+  @@index([scope, scopeRef, createdAt])
+  @@index([tripId, createdAt])
+  @@index([tourSlug, createdAt])
+  @@index([uploaderId, createdAt])
+  @@index([status, createdAt])
+  @@index([deletedAt])
+}
+
+model MediaUploadSession {
+  id             String                  @id
+  assetId        String                  @unique
+  uploaderId     String
+  scope          MediaAssetScope
+  scopeRef       String?
+  tourSlug       String?
+  fileType       MediaAssetKind
+  originalFilename String
+  mimeType       String
+  fileSizeBytes  Int
+  chunkSizeBytes Int
+  totalChunks    Int
+  receivedChunks Int                     @default(0)
+  status         MediaUploadSessionStatus @default(UPLOADING)
+  errorMessage   String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  expiresAt      DateTime
+  completedAt    DateTime?
+  asset          MediaAsset              @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  uploader       User                    @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  chunks         MediaUploadChunk[]
+
+  @@index([uploaderId, createdAt])
+  @@index([status, createdAt])
+  @@index([expiresAt])
+}
+
+model MediaUploadChunk {
+  id         String             @id @default(cuid())
+  sessionId  String
+  chunkIndex Int
+  sizeBytes  Int
+  storageKey String
+  createdAt  DateTime           @default(now())
+  session    MediaUploadSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, chunkIndex])
+  @@index([sessionId, createdAt])
 }
 
 model HitCounter {

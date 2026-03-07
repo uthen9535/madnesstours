@@ -1,0 +1,662 @@
+.scene {
+  position: relative;
+  min-height: clamp(420px, 74vh, 860px);
+  border: 2px solid #294454;
+  background: #030811;
+  overflow: hidden;
+}
+
+.background {
+  position: absolute;
+  inset: 0;
+  background: #020913;
+  overflow: hidden;
+}
+
+.backgroundVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.background::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(90% 70% at 50% 8%, rgb(61 214 198 / 22%) 0%, rgb(61 214 198 / 10%) 30%, transparent 64%),
+    linear-gradient(
+      to bottom,
+      rgb(0 0 0 / 3%) 0%,
+      rgb(0 0 0 / 11%) 35%,
+      rgb(0 0 0 / 25%) 70%,
+      rgb(0 0 0 / 43%) 100%
+    );
+}
+
+.background::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgb(130 219 248 / 4%) 0 1px, transparent 1px 12px);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cabinet {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.cabinetFrame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-style: solid;
+  border-width: 2px;
+  border-color:
+    rgb(80 220 200 / 62%)
+    rgb(80 220 200 / 44%)
+    rgb(7 16 18 / 96%)
+    rgb(80 220 200 / 44%);
+  background:
+    linear-gradient(
+      to bottom,
+      rgb(61 214 198 / 14%) 0%,
+      rgb(0 0 0 / 10%) 35%,
+      rgb(0 0 0 / 24%) 70%,
+      rgb(0 0 0 / 40%) 100%
+    ),
+    linear-gradient(145deg, rgb(19 33 36 / 95%), rgb(11 19 22 / 96%)),
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 4%) 0 1px, transparent 1px 8px);
+  box-shadow:
+    inset 0 2px 0 rgb(120 255 230 / 15%),
+    inset 0 -6px 0 rgb(0 0 0 / 62%),
+    inset 0 0 0 1px rgb(80 220 200 / 22%),
+    0 10px 25px rgb(0 0 0 / 45%),
+    0 0 18px rgb(61 214 198 / 18%);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 0.4rem;
+  padding: clamp(0.34rem, 0.72vw, 0.56rem);
+  transition: box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.cabinetArming .cabinetFrame {
+  box-shadow:
+    inset 0 2px 0 rgb(120 255 230 / 22%),
+    inset 0 -3px 0 rgb(0 0 0 / 52%),
+    inset 0 0 0 1px rgb(80 220 200 / 48%),
+    0 10px 25px rgb(0 0 0 / 50%),
+    0 0 32px rgb(61 214 198 / 42%);
+}
+
+.cabinetHeader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.cabinetControlStrip {
+  width: 100%;
+  border: 1px solid rgb(80 220 200 / 44%);
+  background:
+    linear-gradient(
+      to bottom,
+      rgb(61 214 198 / 12%) 0%,
+      rgb(0 0 0 / 8%) 40%,
+      rgb(0 0 0 / 22%) 100%
+    ),
+    linear-gradient(180deg, rgb(18 47 50 / 92%), rgb(9 28 30 / 95%)),
+    repeating-linear-gradient(90deg, rgb(190 249 255 / 6%) 0 1px, transparent 1px 7px);
+  box-shadow: inset 0 0 0 1px rgb(80 220 200 / 20%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0.2rem 0.26rem;
+}
+
+.controlButtonCluster {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 0.18rem;
+}
+
+.controlButton {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border: 1px solid rgb(80 220 200 / 38%);
+  background: linear-gradient(180deg, rgb(55 96 92 / 92%), rgb(24 45 43 / 95%));
+  box-shadow: inset 0 0 5px rgb(0 0 0 / 55%);
+}
+
+.controlLedCluster {
+  display: flex;
+  align-items: center;
+  gap: 0.17rem;
+}
+
+.controlLed {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #3dd6c6;
+  box-shadow: 0 0 7px #3dd6c6;
+  opacity: 0.5;
+}
+
+.controlLedFast {
+  animation: controlLedFastBlink 1.1s steps(2, start) infinite;
+}
+
+.controlLedMedium {
+  animation: controlLedMediumBlink 1.8s steps(2, start) infinite;
+}
+
+.controlLedSlow {
+  animation: controlLedSlowBlink 2.6s steps(2, start) infinite;
+}
+
+.controlStatusText {
+  color: #91e7dd;
+  font-size: clamp(0.42rem, 0.62vw, 0.54rem);
+  letter-spacing: 0.08em;
+}
+
+.cabinetDrawers {
+  display: grid;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  min-height: 0;
+}
+
+.drawerButton {
+  position: relative;
+  border: 1px solid rgb(80 220 200 / 26%);
+  border-top: 1px solid rgb(120 255 230 / 15%);
+  border-bottom: 1px solid rgb(0 0 0 / 70%);
+  background:
+    linear-gradient(
+      to bottom,
+      rgb(61 214 198 / 11%) 0%,
+      rgb(0 0 0 / 8%) 34%,
+      rgb(0 0 0 / 22%) 70%,
+      rgb(0 0 0 / 36%) 100%
+    ),
+    linear-gradient(180deg, #0f1a1c, #0a1113),
+    repeating-linear-gradient(0deg, rgb(120 249 255 / 4%) 0 1px, transparent 1px 9px);
+  box-shadow:
+    inset 0 0 0 1px rgb(82 130 154 / 20%),
+    inset 0 0 40px rgb(60 220 200 / 8%),
+    inset 0 0 18px rgb(0 0 0 / 68%);
+  min-height: 0;
+  width: 100%;
+  padding: 0;
+  cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+  user-select: none;
+}
+
+.drawerInactive {
+  border-color: rgb(80 220 200 / 20%);
+  box-shadow:
+    inset 0 0 0 1px rgb(79 121 143 / 16%),
+    inset 0 0 40px rgb(60 220 200 / 5%),
+    inset 0 0 14px rgb(0 0 0 / 72%);
+  cursor: default;
+  pointer-events: none;
+}
+
+.drawerActive {
+  border-color: rgb(80 220 200 / 42%);
+  box-shadow:
+    inset 0 0 0 1px rgb(98 144 166 / 22%),
+    inset 0 0 40px rgb(60 220 200 / 9%),
+    inset 0 0 16px rgb(0 0 0 / 70%);
+  cursor: pointer;
+}
+
+.drawerActive:hover,
+.drawerActive:focus-visible {
+  border-color: rgb(80 220 200 / 60%);
+  box-shadow:
+    inset 0 0 0 1px rgb(80 220 200 / 34%),
+    inset 0 0 40px rgb(60 220 200 / 12%),
+    inset 0 0 22px rgb(14 30 42 / 78%),
+    0 0 12px rgb(61 214 198 / 34%);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.drawerLabelPlate {
+  position: absolute;
+  left: 50%;
+  top: 18%;
+  transform: translateX(-50%);
+  width: 68%;
+  min-height: 13px;
+  border: 1px solid rgb(80 220 200 / 38%);
+  background: linear-gradient(180deg, rgb(20 49 51 / 96%), rgb(10 28 30 / 96%));
+  color: #baf8ef;
+  font-size: clamp(0.42rem, 0.62vw, 0.54rem);
+  display: grid;
+  place-items: center;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: inset 0 0 0 1px rgb(80 220 200 / 16%);
+}
+
+.drawerClassified {
+  position: absolute;
+  top: 34%;
+  left: 11%;
+  transform: rotate(-7deg);
+  border: 1px solid #a85b5b;
+  color: #ff8f8f;
+  background: rgb(51 13 13 / 84%);
+  padding: 0.06rem 0.2rem;
+  font-size: clamp(0.39rem, 0.58vw, 0.5rem);
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+.drawerHandle {
+  position: absolute;
+  width: clamp(32px, 42%, 64px);
+  height: 8px;
+  left: 50%;
+  top: 58%;
+  transform: translateX(-50%);
+  border: 1px solid rgb(78 245 213 / 45%);
+  background: linear-gradient(180deg, rgb(43 73 72 / 98%), rgb(20 40 42 / 98%));
+  border-radius: 999px;
+  box-shadow:
+    inset 0 0 6px rgb(78 245 213 / 16%),
+    0 0 10px rgb(78 245 213 / 28%);
+  pointer-events: none;
+}
+
+.hudTooltip {
+  position: absolute;
+  left: 50%;
+  border: 2px solid rgb(80 220 200 / 60%);
+  background:
+    linear-gradient(180deg, rgb(9 33 45 / 96%), rgb(5 17 24 / 96%)),
+    repeating-linear-gradient(0deg, rgb(170 249 255 / 8%) 0 1px, transparent 1px 7px);
+  color: #d9fbff;
+  font-size: 0.74rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  font-weight: 700;
+  min-width: 118px;
+  text-align: center;
+  padding: 0.38rem 0.58rem;
+  box-shadow:
+    inset 0 0 0 1px rgb(173 249 255 / 16%),
+    0 0 14px rgb(61 214 198 / 34%);
+  text-shadow: 0 0 8px rgb(61 214 198 / 30%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+  z-index: 6;
+}
+
+.hudTooltipTopDrawer {
+  top: 21%;
+  transform: translate(-50%, -100%);
+}
+
+.hudTooltipCabinet {
+  top: -3rem;
+  transform: translate(-50%, 2px);
+}
+
+.hudTooltipVisible {
+  opacity: 1;
+}
+
+.hudTooltipTopDrawer.hudTooltipVisible {
+  transform: translate(-50%, calc(-100% - 5px));
+}
+
+.hudTooltipCabinet.hudTooltipVisible {
+  transform: translate(-50%, 0);
+}
+
+.cabinetBase {
+  border: 1px solid rgb(80 220 200 / 28%);
+  background:
+    linear-gradient(
+      to bottom,
+      rgb(61 214 198 / 10%) 0%,
+      rgb(0 0 0 / 10%) 38%,
+      rgb(0 0 0 / 26%) 100%
+    ),
+    linear-gradient(180deg, rgb(18 27 31 / 94%), rgb(10 15 18 / 97%)),
+    repeating-linear-gradient(90deg, rgb(170 244 255 / 6%) 0 1px, transparent 1px 8px);
+  min-height: clamp(18px, 9%, 24px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.28rem;
+  box-shadow: inset 0 0 0 1px rgb(108 152 171 / 16%);
+}
+
+.cabinetBaseVent {
+  height: 7px;
+  border: 1px solid rgb(80 220 200 / 32%);
+  background:
+    repeating-linear-gradient(90deg, rgb(110 154 173 / 45%) 0 1px, transparent 1px 4px),
+    rgb(10 21 30 / 95%);
+}
+
+.cabinetBaseBolt {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  border: 1px solid rgb(80 220 200 / 34%);
+  background: linear-gradient(180deg, rgb(72 114 109 / 95%), rgb(36 61 59 / 95%));
+}
+
+.cabinetLed {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #3dd6c6;
+  box-shadow: 0 0 9px #3dd6c6;
+  justify-self: end;
+  animation: vaultLedBlink 2s steps(2, start) infinite;
+}
+
+.cabinetScanline {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0.16;
+  background: linear-gradient(180deg, transparent 0%, rgb(61 214 198 / 42%) 48%, transparent 100%);
+  animation: vaultScanline 2.8s linear infinite;
+}
+
+.modalRoot {
+  position: fixed;
+  inset: 0;
+  z-index: 700;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding:
+    max(0.75rem, env(safe-area-inset-top))
+    0.75rem
+    max(1.25rem, env(safe-area-inset-bottom));
+}
+
+.modalBackdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgb(0 0 0 / 72%);
+  cursor: pointer;
+}
+
+.modalPanel {
+  position: relative;
+  width: min(1200px, 94vw);
+  max-height: calc(100dvh - max(0.75rem, env(safe-area-inset-top)) - max(1.25rem, env(safe-area-inset-bottom)) - 0.5rem);
+  overflow: auto;
+  border: 2px solid #3f7f90;
+  background:
+    linear-gradient(180deg, rgb(6 24 34 / 95%), rgb(4 15 23 / 96%)),
+    repeating-linear-gradient(0deg, rgb(84 246 255 / 7%) 0 1px, transparent 1px 10px);
+  box-shadow: 0 0 28px rgb(0 0 0 / 64%);
+  padding: 0.9rem;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.modalHeader h2 {
+  margin: 0;
+  color: #bff9ff;
+  letter-spacing: 0.08em;
+}
+
+.modalClose {
+  border: 1px solid #9f6969;
+  background: rgb(45 13 13 / 90%);
+  color: #ff9898;
+  font-weight: 700;
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
+}
+
+.modalGrid {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 0.8rem;
+}
+
+.itemGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.65rem;
+}
+
+.itemCard {
+  border: 1px solid #3e7787;
+  background: rgb(6 22 30 / 82%);
+  color: inherit;
+  text-align: left;
+  padding: 0.56rem;
+  display: grid;
+  gap: 0.36rem;
+  cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.itemCard:hover {
+  border-color: #79d3e8;
+  box-shadow: 0 0 14px rgb(120 236 255 / 25%);
+}
+
+.itemCardSelected {
+  border-color: #aef3ff;
+  box-shadow: inset 0 0 0 1px rgb(173 255 245 / 34%), 0 0 16px rgb(117 245 255 / 33%);
+}
+
+.itemThumbFrame {
+  border: 1px dashed #61acc1;
+  min-height: 96px;
+  display: grid;
+  place-items: center;
+  color: #7ed4ea;
+  background: rgb(8 27 38 / 85%);
+  font-size: 0.74rem;
+  text-align: center;
+  padding: 0.25rem;
+}
+
+.itemMeta {
+  margin: 0;
+  color: #87c9dd;
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+}
+
+.itemTitle {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.itemStatus {
+  justify-self: start;
+  border: 1px solid;
+  padding: 0.16rem 0.35rem;
+  font-size: 0.67rem;
+  letter-spacing: 0.08em;
+}
+
+.itemRecovered {
+  border-color: #6ddf9c;
+  color: #9df4bc;
+  background: rgb(14 62 33 / 70%);
+}
+
+.itemClassified {
+  border-color: #b76f6f;
+  color: #f7adad;
+  background: rgb(54 19 19 / 80%);
+}
+
+.itemDetail {
+  border: 1px solid #3d7485;
+  background: rgb(7 23 33 / 84%);
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+}
+
+.itemDetailFrame {
+  border: 1px dashed #69b7cf;
+  min-height: 190px;
+  display: grid;
+  place-items: center;
+  color: #8fd7ea;
+  background: rgb(8 27 38 / 82%);
+  text-align: center;
+  padding: 0.35rem;
+}
+
+.itemDetailTitle {
+  margin: 0;
+}
+
+.itemDetailDescription {
+  margin: 0;
+}
+
+.itemDetailAction {
+  justify-self: start;
+  text-decoration: none;
+}
+
+.itemLockedStamp {
+  justify-self: start;
+  border: 1px solid #be7373;
+  color: #ffb1b1;
+  background: rgb(48 15 15 / 82%);
+  padding: 0.2rem 0.38rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.07em;
+}
+
+@keyframes vaultLedBlink {
+  0%,
+  46%,
+  100% {
+    opacity: 0.35;
+  }
+  48%,
+  64% {
+    opacity: 1;
+  }
+}
+
+@keyframes controlLedFastBlink {
+  0%,
+  30%,
+  100% {
+    opacity: 0.32;
+  }
+  32%,
+  70% {
+    opacity: 1;
+  }
+}
+
+@keyframes controlLedMediumBlink {
+  0%,
+  44%,
+  100% {
+    opacity: 0.25;
+  }
+  46%,
+  64% {
+    opacity: 0.92;
+  }
+}
+
+@keyframes controlLedSlowBlink {
+  0%,
+  72%,
+  100% {
+    opacity: 0.22;
+  }
+  74%,
+  84% {
+    opacity: 0.88;
+  }
+}
+
+@keyframes vaultScanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(120%);
+  }
+}
+
+@media (max-width: 1100px) {
+  .modalGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .scene {
+    min-height: 1120px;
+  }
+
+  .cabinet {
+    width: min(53vw, 240px) !important;
+    height: clamp(210px, 24vh, 272px) !important;
+    left: 50% !important;
+    transform: translateX(-50%);
+  }
+
+  .hudTooltipCabinet {
+    top: -2.6rem;
+  }
+
+  .cabinet[data-category="punches"] {
+    top: 8% !important;
+  }
+
+  .cabinet[data-category="stamps"] {
+    top: 37% !important;
+  }
+
+  .cabinet[data-category="artifacts"] {
+    top: 66% !important;
+  }
+}

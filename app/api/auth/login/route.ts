@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSession, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { withSqliteRetry } from "@/lib/sqliteRetry";
 
 const loginSchema = z.object({
   username: z.string().trim().min(1).transform((value) => value.toLowerCase()),
@@ -31,10 +32,18 @@ function invalidCredentialsResponse(request: Request, json: boolean) {
 
 function serviceUnavailableResponse(request: Request, json: boolean) {
   if (json) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json(
+      { error: "Service temporarily unavailable. Retry in a few seconds." },
+      {
+        status: 503,
+        headers: {
+          "Retry-After": "3"
+        }
+      }
+    );
   }
 
-  return NextResponse.redirect(new URL("/login?error=Service+temporarily+unavailable", request.url));
+  return NextResponse.redirect(new URL("/login?error=Service+temporarily+unavailable.+Retry+in+a+few+seconds", request.url));
 }
 
 async function parseLoginRequest(request: Request) {
@@ -87,9 +96,28 @@ export async function POST(request: Request) {
   let user;
 
   try {
-    user = await prisma.user.findUnique({
-      where: { username: parsed.data.username }
-    });
+    user = await withSqliteRetry(
+      () =>
+        prisma.user.findUnique({
+          where: { username: parsed.data.username }
+        }),
+      8,
+      {
+        baseDelayMs: 220,
+        onRetry: async () => {
+          try {
+            await prisma.$disconnect();
+          } catch {
+            // Ignore disconnect failures during transient outages.
+          }
+          try {
+            await prisma.$connect();
+          } catch {
+            // Ignore reconnect failures; retry loop handles backoff.
+          }
+        }
+      }
+    );
   } catch (error) {
     console.error("Login user lookup failed.", error);
     return serviceUnavailableResponse(request, parsedRequest.json);

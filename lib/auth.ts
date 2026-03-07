@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 
 const COOKIE_NAME = process.env.SESSION_COOKIE_NAME ?? "madnessnet_session";
 const SESSION_MAX_AGE_DAYS = Number(process.env.SESSION_MAX_AGE_DAYS ?? 7);
+const SESSION_STORAGE_MODE = (process.env.SESSION_STORAGE_MODE ?? "stateless").toLowerCase();
 const GLOBAL_SITE_PASSWORD = process.env.GLOBAL_SITE_PASSWORD ?? "finnsbeachclub";
 const GLOBAL_SITE_PIN = process.env.GLOBAL_SITE_PIN ?? "170017";
 const SESSION_SECRET = process.env.SESSION_SECRET ?? `${GLOBAL_SITE_PASSWORD}-session-secret`;
@@ -16,6 +17,10 @@ type StatelessSessionPayload = {
   userId: string;
   exp: number;
 };
+
+function isDatabaseSessionStoreEnabled(): boolean {
+  return SESSION_STORAGE_MODE === "db" || SESSION_STORAGE_MODE === "database";
+}
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12);
@@ -91,22 +96,26 @@ function readStatelessSessionToken(token: string): StatelessSessionPayload | nul
 }
 
 export async function createSession(userId: string): Promise<void> {
-  const rawToken = randomBytes(32).toString("hex");
-  const tokenHash = hashSessionToken(rawToken);
   const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000);
-  let cookieValue = rawToken;
+  let cookieValue = createStatelessSessionToken(userId, expiresAt);
 
-  try {
-    await prisma.session.create({
-      data: {
-        tokenHash,
-        userId,
-        expiresAt
-      }
-    });
-  } catch (error) {
-    console.warn("Session DB write failed, falling back to stateless session cookie.", error);
-    cookieValue = createStatelessSessionToken(userId, expiresAt);
+  if (isDatabaseSessionStoreEnabled()) {
+    const rawToken = randomBytes(32).toString("hex");
+    const tokenHash = hashSessionToken(rawToken);
+    cookieValue = rawToken;
+
+    try {
+      await prisma.session.create({
+        data: {
+          tokenHash,
+          userId,
+          expiresAt
+        }
+      });
+    } catch (error) {
+      console.warn("Session DB write failed, falling back to stateless session cookie.", error);
+      cookieValue = createStatelessSessionToken(userId, expiresAt);
+    }
   }
 
   const cookieStore = await cookies();

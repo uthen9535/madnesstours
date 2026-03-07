@@ -1,10 +1,11 @@
 "use client";
 
+import { clsx } from "clsx";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import worldMapData from "@/data/world-map.json";
 
-type TripPin = {
+export type TripPin = {
   id: string;
   slug: string;
   title: string;
@@ -26,6 +27,26 @@ type ResolvedTripPin = TripPin & {
 
 type CyberpunkTripMapProps = {
   trips: TripPin[];
+  powered?: boolean;
+  targetingMode?: boolean;
+  targetCursor?: {
+    xPct: number;
+    yPct: number;
+  };
+  zoomCommand?: {
+    id: number;
+    direction: "in" | "out";
+  } | null;
+  onZoomLevelChange?: (zoomPct: number) => void;
+  onTargetSelect?: (payload: { xPct: number; yPct: number; latitude: number; longitude: number }) => void;
+  onTargetingArmCenter?: (payload: { xPct: number; yPct: number }) => void;
+  voteTargets?: Array<{
+    id: string;
+    xPct: number;
+    yPct: number;
+  }>;
+  className?: string;
+  showDiagnostics?: boolean;
 };
 type ZoomAnchor = {
   x: number;
@@ -63,11 +84,13 @@ type WorldPaths = {
 };
 
 const MAP_WIDTH = 1000;
-const MAP_HEIGHT = 520;
+const MAP_HEIGHT = 416;
 const ZOOM_MIN = 1;
 const ZOOM_MAX = 2.8;
-const ZOOM_STEP = 0.2;
+const ZOOM_STEP = 0.35;
 const DATELINE_THRESHOLD = MAP_WIDTH / 2;
+const INITIAL_ZOOM = 1;
+const BASE_HORIZONTAL_SPAN = 2;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -193,19 +216,58 @@ function resolvePin(pin: TripPin): ResolvedTripPin {
   };
 }
 
-export function CyberpunkTripMap({ trips }: CyberpunkTripMapProps) {
+function percentToLatLng(xPct: number, yPct: number): { latitude: number; longitude: number } {
+  const latitude = clamp(90 - (yPct / 100) * 180, -85, 85);
+  const longitude = clamp((xPct / 100) * 360 - 180, -180, 180);
+  return { latitude, longitude };
+}
+
+export function CyberpunkTripMap({
+  trips,
+  powered = true,
+  targetingMode = false,
+  targetCursor,
+  zoomCommand = null,
+  onZoomLevelChange,
+  onTargetSelect,
+  onTargetingArmCenter,
+  voteTargets = [],
+  className,
+  showDiagnostics = true
+}: CyberpunkTripMapProps) {
   const router = useRouter();
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(INITIAL_ZOOM);
   const [isDragging, setIsDragging] = useState(false);
-  const zoomRef = useRef(1);
+  const zoomRef = useRef(INITIAL_ZOOM);
   const canvasRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<DragState | null>(null);
+  const lastZoomCommandIdRef = useRef<number | null>(null);
+  const hasCenteredInitialViewRef = useRef(false);
+  const wasTargetingModeRef = useRef(false);
   const resolvedPins = useMemo(() => trips.map(resolvePin), [trips]);
+  const resolvedVoteTargets = useMemo(() => {
+    return voteTargets.map((target) => {
+      const nearbyCount = voteTargets.reduce((count, other) => {
+        const dx = target.xPct - other.xPct;
+        const dy = target.yPct - other.yPct;
+        return count + (Math.hypot(dx, dy) <= 9 ? 1 : 0);
+      }, 0);
+      return {
+        ...target,
+        intensity: clamp(nearbyCount, 1, 6)
+      };
+    });
+  }, [voteTargets]);
 
-  function applyZoom(nextZoom: number, anchor?: ZoomAnchor) {
+  const applyZoom = useCallback((nextZoom: number, anchor?: ZoomAnchor) => {
+    if (!powered) {
+      return;
+    }
+
+    const currentZoom = zoomRef.current;
     const clampedZoom = clamp(Number(nextZoom.toFixed(2)), ZOOM_MIN, ZOOM_MAX);
-    if (clampedZoom === zoomRef.current) {
+    if (clampedZoom === currentZoom) {
       return;
     }
 
@@ -216,35 +278,30 @@ export function CyberpunkTripMap({ trips }: CyberpunkTripMapProps) {
       return;
     }
 
-    const stage = stageRef.current;
     const anchorX = clamp(anchor?.x ?? canvas.clientWidth / 2, 0, canvas.clientWidth);
     const anchorY = clamp(anchor?.y ?? canvas.clientHeight / 2, 0, canvas.clientHeight);
-    const stageWidth = Math.max(stage?.clientWidth ?? 1, 1);
-    const stageHeight = Math.max(stage?.clientHeight ?? 1, 1);
-    const pointX = canvas.scrollLeft + anchorX - (stage?.offsetLeft ?? 0);
-    const pointY = canvas.scrollTop + anchorY - (stage?.offsetTop ?? 0);
-    const relativeX = clamp(pointX / stageWidth, 0, 1);
-    const relativeY = clamp(pointY / stageHeight, 0, 1);
+    const startLeft = canvas.scrollLeft;
+    const startTop = canvas.scrollTop;
+    const zoomRatio = clampedZoom / currentZoom;
 
     zoomRef.current = clampedZoom;
     setZoom(clampedZoom);
 
     requestAnimationFrame(() => {
       const nextCanvas = canvasRef.current;
-      const nextStage = stageRef.current;
-      if (!nextCanvas || !nextStage) {
+      if (!nextCanvas) {
         return;
       }
 
-      const nextTargetX = nextStage.offsetLeft + relativeX * nextStage.clientWidth - anchorX;
-      const nextTargetY = nextStage.offsetTop + relativeY * nextStage.clientHeight - anchorY;
       const maxLeft = Math.max(nextCanvas.scrollWidth - nextCanvas.clientWidth, 0);
       const maxTop = Math.max(nextCanvas.scrollHeight - nextCanvas.clientHeight, 0);
+      const nextTargetX = anchor ? (startLeft + anchorX) * zoomRatio - anchorX : maxLeft / 2;
+      const nextTargetY = anchor ? (startTop + anchorY) * zoomRatio - anchorY : 0;
 
       nextCanvas.scrollLeft = clamp(nextTargetX, 0, maxLeft);
       nextCanvas.scrollTop = clamp(nextTargetY, 0, maxTop);
     });
-  }
+  }, [powered]);
 
   function stopDragging(pointerId: number, canvas: HTMLDivElement) {
     if (canvas.hasPointerCapture(pointerId)) {
@@ -255,6 +312,10 @@ export function CyberpunkTripMap({ trips }: CyberpunkTripMapProps) {
   }
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (!powered || targetingMode) {
+      return;
+    }
+
     if (event.button !== 0) {
       return;
     }
@@ -278,6 +339,10 @@ export function CyberpunkTripMap({ trips }: CyberpunkTripMapProps) {
   }
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!powered || targetingMode) {
+      return;
+    }
+
     const dragState = dragStateRef.current;
     if (!dragState || dragState.pointerId !== event.pointerId) {
       return;
@@ -286,11 +351,17 @@ export function CyberpunkTripMap({ trips }: CyberpunkTripMapProps) {
     const canvas = event.currentTarget;
     const deltaX = event.clientX - dragState.startX;
     const deltaY = event.clientY - dragState.startY;
-    canvas.scrollLeft = dragState.startScrollLeft - deltaX;
-    canvas.scrollTop = dragState.startScrollTop - deltaY;
+    const maxLeft = Math.max(canvas.scrollWidth - canvas.clientWidth, 0);
+    const maxTop = Math.max(canvas.scrollHeight - canvas.clientHeight, 0);
+    canvas.scrollLeft = clamp(dragState.startScrollLeft - deltaX, 0, maxLeft);
+    canvas.scrollTop = clamp(dragState.startScrollTop - deltaY, 0, maxTop);
   }
 
   function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
+    if (!powered || targetingMode) {
+      return;
+    }
+
     const dragState = dragStateRef.current;
     if (!dragState || dragState.pointerId !== event.pointerId) {
       return;
@@ -299,6 +370,10 @@ export function CyberpunkTripMap({ trips }: CyberpunkTripMapProps) {
   }
 
   function handlePointerCancel(event: PointerEvent<HTMLDivElement>) {
+    if (!powered || targetingMode) {
+      return;
+    }
+
     const dragState = dragStateRef.current;
     if (!dragState || dragState.pointerId !== event.pointerId) {
       return;
@@ -307,6 +382,10 @@ export function CyberpunkTripMap({ trips }: CyberpunkTripMapProps) {
   }
 
   function handleLostPointerCapture(event: PointerEvent<HTMLDivElement>) {
+    if (!powered || targetingMode) {
+      return;
+    }
+
     const dragState = dragStateRef.current;
     if (!dragState || dragState.pointerId !== event.pointerId) {
       return;
@@ -315,32 +394,116 @@ export function CyberpunkTripMap({ trips }: CyberpunkTripMapProps) {
     setIsDragging(false);
   }
 
-  function handleWheel(event: WheelEvent<HTMLDivElement>) {
-    event.preventDefault();
+  function handleTargetingClick(event: PointerEvent<HTMLButtonElement>) {
+    if (!powered || !targetingMode || !onTargetSelect) {
+      return;
+    }
+
     const rect = event.currentTarget.getBoundingClientRect();
-    const anchor = {
-      x: event.clientX - rect.left - event.currentTarget.clientLeft,
-      y: event.clientY - rect.top - event.currentTarget.clientTop
-    };
-    const zoomFactor = Math.exp(-event.deltaY * 0.0018);
-    applyZoom(zoomRef.current * zoomFactor, anchor);
+    const xPct = clamp(((event.clientX - rect.left) / rect.width) * 100, 0, 100);
+    const yPct = clamp(((event.clientY - rect.top) / rect.height) * 100, 0, 100);
+    const { latitude, longitude } = percentToLatLng(xPct, yPct);
+    onTargetSelect({ xPct, yPct, latitude, longitude });
   }
 
+  useEffect(() => {
+    const range = ZOOM_MAX - ZOOM_MIN;
+    const normalized = range > 0 ? ((zoom - ZOOM_MIN) / range) * 100 : 0;
+    onZoomLevelChange?.(Math.round(clamp(normalized, 0, 100)));
+  }, [onZoomLevelChange, zoom]);
+
+  useEffect(() => {
+    if (!zoomCommand || lastZoomCommandIdRef.current === zoomCommand.id) {
+      return;
+    }
+
+    lastZoomCommandIdRef.current = zoomCommand.id;
+    const canvas = canvasRef.current;
+    const zoomAnchor = canvas
+      ? {
+          x: canvas.clientWidth / 2,
+          y: canvas.clientHeight / 2
+        }
+      : undefined;
+    if (zoomCommand.direction === "in") {
+      applyZoom(zoomRef.current + ZOOM_STEP, zoomAnchor);
+    } else {
+      applyZoom(zoomRef.current - ZOOM_STEP, zoomAnchor);
+    }
+  }, [applyZoom, zoomCommand]);
+
+  useEffect(() => {
+    if (hasCenteredInitialViewRef.current || !powered) {
+      return;
+    }
+
+    let frame = 0;
+    let attempts = 0;
+
+    const tryCenter = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        return;
+      }
+
+      const maxLeft = Math.max(canvas.scrollWidth - canvas.clientWidth, 0);
+      if (maxLeft >= 0) {
+        canvas.scrollLeft = 0;
+        canvas.scrollTop = 0;
+        hasCenteredInitialViewRef.current = true;
+        return;
+      }
+
+      if (attempts < 8) {
+        attempts += 1;
+        frame = window.requestAnimationFrame(tryCenter);
+      }
+    };
+
+    frame = window.requestAnimationFrame(tryCenter);
+    return () => window.cancelAnimationFrame(frame);
+  }, [powered, zoom]);
+
+  useEffect(() => {
+    const justArmed = targetingMode && !wasTargetingModeRef.current;
+    wasTargetingModeRef.current = targetingMode;
+
+    if (!justArmed || !onTargetingArmCenter) {
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const viewportCenterX = canvas.scrollLeft + canvas.clientWidth / 2;
+    const viewportCenterY = canvas.scrollTop + canvas.clientHeight / 2;
+    const xPct = clamp((viewportCenterX / Math.max(canvas.scrollWidth, 1)) * 100, 0, 100);
+    const yPct = clamp((viewportCenterY / Math.max(canvas.scrollHeight, 1)) * 100, 0, 100);
+    onTargetingArmCenter({ xPct, yPct });
+  }, [onTargetingArmCenter, targetingMode]);
+
   return (
-    <div className="google-map-shell">
+    <div className={clsx("google-map-shell", className, !powered && "google-map-shell--offline")}>
       <div
         ref={canvasRef}
-        className={`google-map-canvas retro-map-canvas${isDragging ? " retro-map-canvas--dragging" : ""}`}
+        className={`google-map-canvas retro-map-canvas${isDragging ? " retro-map-canvas--dragging" : ""}${
+          targetingMode ? " retro-map-canvas--targeting" : ""
+        }`}
         role="application"
-        aria-label="Trip destination world map"
-        onWheel={handleWheel}
+        aria-label="Tour destination world map"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
         onLostPointerCapture={handleLostPointerCapture}
       >
-        <div ref={stageRef} className="retro-map-stage" style={{ width: `${(100 * zoom).toFixed(2)}%` }}>
+        <div
+          ref={stageRef}
+          className="retro-map-stage"
+          style={{ width: `calc(${(100 * BASE_HORIZONTAL_SPAN * zoom).toFixed(3)}% + 2px)` }}
+        >
           <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} className="retro-map-svg" aria-hidden="true">
             <defs>
               <linearGradient id="retro-map-bg" x1="0" y1="0" x2="1" y2="1">
@@ -353,7 +516,7 @@ export function CyberpunkTripMap({ trips }: CyberpunkTripMapProps) {
             <rect x="0" y="0" width={MAP_WIDTH} height={MAP_HEIGHT} fill="url(#retro-map-bg)" />
             <g className="retro-map-grid-lines">
               {Array.from({ length: 13 }).map((_, index) => (
-                <line key={`h-${index}`} x1="0" y1={index * 43.333} x2={MAP_WIDTH} y2={index * 43.333} />
+                <line key={`h-${index}`} x1="0" y1={index * (MAP_HEIGHT / 12)} x2={MAP_WIDTH} y2={index * (MAP_HEIGHT / 12)} />
               ))}
               {Array.from({ length: 21 }).map((_, index) => (
                 <line key={`v-${index}`} x1={index * 50} y1="0" x2={index * 50} y2={MAP_HEIGHT} />
@@ -374,6 +537,47 @@ export function CyberpunkTripMap({ trips }: CyberpunkTripMapProps) {
           </svg>
           <div className="retro-map-overlay retro-map-overlay--scanlines" />
           <div className="retro-map-overlay retro-map-overlay--glow" />
+          {resolvedVoteTargets.length > 0 ? (
+            <div className="retro-map-vote-layer" aria-hidden>
+              {resolvedVoteTargets.map((target) => (
+                <div
+                  key={target.id}
+                  className="retro-map-vote-node"
+                  style={
+                    {
+                      left: `${target.xPct}%`,
+                      top: `${target.yPct}%`,
+                      "--vote-intensity": target.intensity
+                    } as CSSProperties
+                  }
+                >
+                  <span className="retro-map-vote-node__ring retro-map-vote-node__ring--a" />
+                  <span className="retro-map-vote-node__ring retro-map-vote-node__ring--b" />
+                  <span className="retro-map-vote-node__core" />
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {powered && targetingMode ? (
+            <button
+              type="button"
+              className="retro-map-target-overlay"
+              aria-label="Select next target destination on map"
+              onPointerDown={handleTargetingClick}
+            >
+              <span
+                className="retro-map-target-overlay__crosshair"
+                style={{
+                  left: `${targetCursor?.xPct ?? 50}%`,
+                  top: `${targetCursor?.yPct ?? 50}%`
+                }}
+              >
+                <span className="retro-map-target-overlay__line retro-map-target-overlay__line--v" />
+                <span className="retro-map-target-overlay__line retro-map-target-overlay__line--h" />
+                <span className="retro-map-target-overlay__ring" />
+              </span>
+            </button>
+          ) : null}
 
           {resolvedPins.map((pin) => {
             const objective = pin.missionStatus === "MISSION_OBJECTIVE";
@@ -386,55 +590,40 @@ export function CyberpunkTripMap({ trips }: CyberpunkTripMapProps) {
                 }`}
                 style={{ left: `${pin.resolvedX}%`, top: `${pin.resolvedY}%` }}
                 title={`${pin.title} (${pin.location}) :: ${objective ? "Mission objective" : "Mission complete"}`}
-                onClick={() => router.push(`/trips/${pin.slug}`)}
+                disabled={!powered || targetingMode}
+                onClick={() => router.push(`/tours/${pin.slug}`)}
               >
                 <span className="retro-map-pin__label">{pin.title}</span>
               </button>
             );
           })}
         </div>
-        <div className="retro-map-zoom-overlay" aria-label="Map zoom controls">
-          <button
-            type="button"
-            className="neon-button retro-map-zoom"
-            onClick={() => applyZoom(zoomRef.current + ZOOM_STEP)}
-            disabled={zoom >= ZOOM_MAX}
-            aria-label="Zoom in map"
-          >
-            +
-          </button>
-          <button
-            type="button"
-            className="neon-button retro-map-zoom"
-            onClick={() => applyZoom(zoomRef.current - ZOOM_STEP)}
-            disabled={zoom <= ZOOM_MIN}
-            aria-label="Zoom out map"
-          >
-            -
-          </button>
-        </div>
-        <span className="tag retro-map-zoom-level">{Math.round(zoom * 100)}%</span>
       </div>
+      <span className="tag retro-map-zoom-level">{Math.round(clamp(((zoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN)) * 100, 0, 100))}%</span>
 
-      <p className="meta">Hover and scroll to zoom toward the cursor. Click and drag to pan the map.</p>
-      <div className="google-map-legend">
-        <span className="google-map-legend__item">
-          <span className="google-map-legend__dot google-map-legend__dot--mission-complete" /> mission complete
-        </span>
-        <span className="google-map-legend__item">
-          <span className="google-map-legend__dot google-map-legend__dot--mission-objective" /> mission objective
-        </span>
-      </div>
-      <div className="google-map-coordinates">
-        {resolvedPins.map((pin) => (
-          <p key={pin.id}>
-            {pin.title} :: {pin.resolvedLatitude.toFixed(4)}, {pin.resolvedLongitude.toFixed(4)}
-            {" :: "}
-            {pin.missionStatus === "MISSION_OBJECTIVE" ? "mission objective" : "mission complete"}
-            {pin.usingLegacyPosition ? " (legacy % converted)" : ""}
-          </p>
-        ))}
-      </div>
+      {showDiagnostics ? (
+        <>
+          <p className="meta">Hover and scroll to zoom toward the cursor. Click and drag to pan the map.</p>
+          <div className="google-map-legend">
+            <span className="google-map-legend__item">
+              <span className="google-map-legend__dot google-map-legend__dot--mission-complete" /> mission complete
+            </span>
+            <span className="google-map-legend__item">
+              <span className="google-map-legend__dot google-map-legend__dot--mission-objective" /> mission objective
+            </span>
+          </div>
+          <div className="google-map-coordinates">
+            {resolvedPins.map((pin) => (
+              <p key={pin.id}>
+                {pin.title} :: {pin.resolvedLatitude.toFixed(4)}, {pin.resolvedLongitude.toFixed(4)}
+                {" :: "}
+                {pin.missionStatus === "MISSION_OBJECTIVE" ? "mission objective" : "mission complete"}
+                {pin.usingLegacyPosition ? " (legacy % converted)" : ""}
+              </p>
+            ))}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

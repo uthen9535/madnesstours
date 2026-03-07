@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser, hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { withSqliteRetry } from "@/lib/sqliteRetry";
 
 const pinUpdateSchema = z.object({
   userId: z.string().min(1),
@@ -68,10 +69,12 @@ export async function POST(request: Request) {
       return responseForFailure(request, json, 403, "Forbidden");
     }
 
-    const target = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true }
-    });
+    const target = await withSqliteRetry(() =>
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true }
+      })
+    );
 
     if (!target) {
       return responseForFailure(request, json, 404, "User not found");
@@ -80,14 +83,16 @@ export async function POST(request: Request) {
     const passwordHash = await hashPassword(customPin);
     const forcePinResetPrompt = actor.role === Role.admin && actor.id !== userId;
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        pin: customPin,
-        passwordHash,
-        pinResetComplete: forcePinResetPrompt ? false : true
-      }
-    });
+    await withSqliteRetry(() =>
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          pin: customPin,
+          passwordHash,
+          pinResetComplete: forcePinResetPrompt ? false : true
+        }
+      })
+    );
 
     if (json) {
       return NextResponse.json({ ok: true });

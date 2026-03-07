@@ -1,0 +1,10 @@
+# Build and package artifacts
+.next
+node_modules
+
+# Local tooling/workspace artifacts
+.tmp
+tools
+
+# Local media storage cache (should be object storage-backed in production)
+public/uploads/media

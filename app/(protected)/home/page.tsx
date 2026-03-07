@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
+import { MediaAssetKind, MediaAssetStatus, MediaType } from "@prisma/client";
 import { BlinkTag } from "@/components/BlinkTag";
 import { ChatAutoRefresh } from "@/components/ChatAutoRefresh";
 import { ChatThreadViewport } from "@/components/ChatThreadViewport";
@@ -12,12 +13,35 @@ import { ProfileLink } from "@/components/ProfileLink";
 import { RetroWindow } from "@/components/RetroWindow";
 import { requireUser } from "@/lib/auth";
 import { getBTCWeeklySnapshot } from "@/lib/btc";
+import {
+  createChatMemePayload,
+  encodeChatMemeMessage,
+  extractLinkCandidatesFromMessage,
+  parseChatMemeMessage
+} from "@/lib/chatMemeMessage";
 import { getETHWeeklySnapshot } from "@/lib/eth";
 import { formatEthUnitsFromBase, parseEthUnitsToBase } from "@/lib/ethPurse";
+import { findLibraryMemeByLink, listLibraryMemesForViewer, normalizeInternalMemeLink } from "@/lib/libraryMemes";
+import type { LibraryMemeSource } from "@/lib/libraryMemeTypes";
 import { getOperatorDashboardData } from "@/lib/operatorDashboard";
 import { prisma } from "@/lib/prisma";
 import { formatBtcUnitsFromSats, parseBtcUnitsToSats } from "@/lib/satoshi";
 import { withSqliteRetry } from "@/lib/sqliteRetry";
+
+const ORIGINAL_MEDIA_ASSET_URL_PATTERN = /\/uploads\/media\/assets\/[^/]+\/original\.[a-z0-9]+(?:$|[?#])/i;
+
+function isOriginalMediaAssetUrl(url: string | null | undefined): boolean {
+  return typeof url === "string" && ORIGINAL_MEDIA_ASSET_URL_PATTERN.test(url);
+}
+
+function toLibraryMemeSource(value: string): LibraryMemeSource | null {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "asset" || normalized === "legacy") {
+    return normalized;
+  }
+
+  return null;
+}
 
 async function sendHomeChatMessage(formData: FormData) {
   "use server";
@@ -157,6 +181,40 @@ async function sendHomeChatMessage(formData: FormData) {
       console.error("chat transmission ethereum send failed", error);
       return;
     }
+  } else if (intent === "meme") {
+    const selectedMemeId = String(formData.get("selectedMemeId") ?? "").trim();
+    const selectedMemeSource = toLibraryMemeSource(String(formData.get("selectedMemeSource") ?? ""));
+    const selectedMemeLink = String(formData.get("selectedMemeLink") ?? "").trim();
+    if (!selectedMemeId || !selectedMemeSource) {
+      return;
+    }
+
+    try {
+      const memes = await listLibraryMemesForViewer({
+        id: user.id,
+        role: user.role
+      });
+      const selectedMeme = memes.find((item) => item.id === selectedMemeId && item.source === selectedMemeSource);
+      if (!selectedMeme) {
+        return;
+      }
+
+      const encodedMessage = encodeChatMemeMessage(
+        createChatMemePayload(selectedMeme, selectedMemeLink || selectedMeme.copyUrl)
+      );
+      await withSqliteRetry(() =>
+        prisma.guestbookEntry.create({
+          data: {
+            userId: user.id,
+            tripId: null,
+            message: encodedMessage
+          }
+        })
+      );
+    } catch (error) {
+      console.error("chat transmission meme add failed", error);
+      return;
+    }
   } else {
     const message = String(formData.get("message") ?? "").trim();
     if (!message || message.length > 500) {
@@ -164,12 +222,33 @@ async function sendHomeChatMessage(formData: FormData) {
     }
 
     try {
+      let messageToStore = message;
+      const linkCandidates = extractLinkCandidatesFromMessage(message).filter(
+        (candidate) => normalizeInternalMemeLink(candidate) !== null
+      );
+
+      if (linkCandidates.length > 0) {
+        const memes = await listLibraryMemesForViewer({
+          id: user.id,
+          role: user.role
+        });
+        for (const linkCandidate of linkCandidates) {
+          const matchedMeme = findLibraryMemeByLink(memes, linkCandidate);
+          if (!matchedMeme) {
+            continue;
+          }
+
+          messageToStore = encodeChatMemeMessage(createChatMemePayload(matchedMeme, linkCandidate));
+          break;
+        }
+      }
+
       await withSqliteRetry(() =>
         prisma.guestbookEntry.create({
           data: {
             userId: user.id,
             tripId: null,
-            message
+            message: messageToStore
           }
         })
       );
@@ -512,9 +591,82 @@ export default async function HomePage() {
   ]);
   const [totalMembers, totalTours, satoshiDropEvents, ethDropEvents] = telemetry;
   const shotOClockEvents = satoshiDropEvents + ethDropEvents;
-  const kpiMax = Math.max(totalMembers, totalTours, shotOClockEvents, 1);
-  const kpiPct = (value: number) => `${Math.max(12, Math.round((value / kpiMax) * 100))}%`;
-  const chatEntries = [...chatEntriesDesc].reverse();
+  const chatEntries = [...chatEntriesDesc].reverse().map((entry) => ({
+    ...entry,
+    parsedMessage: parseChatMemeMessage(entry.message)
+  }));
+  const latestTransmissionAt = chatEntriesDesc[0]?.createdAt ?? null;
+  const communicatorActive =
+    latestTransmissionAt !== null ? Date.now() - latestTransmissionAt.getTime() <= 5 * 60 * 1000 : false;
+  const communicatorStateTone = communicatorActive ? "LIVE" : "IDLE";
+  const recentTripIds = recentTrips.map((trip) => trip.id);
+  const [recentTripCovers, recentTripFallbackImages, recentTripFallbackAssetImages] =
+    recentTripIds.length > 0
+      ? await Promise.all([
+          prisma.mediaItem.findMany({
+            where: {
+              tripId: { in: recentTripIds },
+              type: MediaType.OTHER,
+              title: "__trip_cover__"
+            },
+            select: {
+              tripId: true,
+              url: true
+            }
+          }),
+          prisma.mediaItem.findMany({
+            where: {
+              tripId: { in: recentTripIds },
+              type: MediaType.IMAGE
+            },
+            orderBy: { createdAt: "desc" },
+            select: {
+              tripId: true,
+              url: true
+            }
+          }),
+          prisma.mediaAsset.findMany({
+            where: {
+              tripId: { in: recentTripIds },
+              deletedAt: null,
+              status: MediaAssetStatus.READY,
+              fileType: { in: [MediaAssetKind.IMAGE, MediaAssetKind.GIF] }
+            },
+            orderBy: { createdAt: "desc" },
+            select: {
+              tripId: true,
+              cardUrl: true,
+              thumbnailUrl: true
+            }
+          })
+        ])
+      : [[], [], []];
+  const recentTripCoverById = new Map<string, string>();
+  for (const item of recentTripFallbackAssetImages) {
+    if (!item.tripId || recentTripCoverById.has(item.tripId)) {
+      continue;
+    }
+    const coverUrl = item.cardUrl ?? item.thumbnailUrl;
+    if (!coverUrl) {
+      continue;
+    }
+    recentTripCoverById.set(item.tripId, coverUrl);
+  }
+  for (const item of recentTripCovers) {
+    if (!item.tripId) {
+      continue;
+    }
+    if (isOriginalMediaAssetUrl(item.url) && recentTripCoverById.has(item.tripId)) {
+      continue;
+    }
+    recentTripCoverById.set(item.tripId, item.url);
+  }
+  for (const item of recentTripFallbackImages) {
+    if (!item.tripId || recentTripCoverById.has(item.tripId)) {
+      continue;
+    }
+    recentTripCoverById.set(item.tripId, item.url);
+  }
 
   return (
     <div className="stack">
@@ -534,40 +686,27 @@ export default async function HomePage() {
                 <OperatorDashboardDetails {...operatorDashboard} />
               </RetroWindow>
 
-              <RetroWindow title="Member KPIs" className="home-top-panel home-top-panel--command-station">
-                <div className="card-list">
-                  <div className="card">
-                    <h3>Total Members</h3>
-                    <p className="meta">{totalMembers.toLocaleString()} members in system</p>
-                    <div className="submarine-chart__meter" aria-hidden>
-                      <span style={{ width: kpiPct(totalMembers) }} />
-                    </div>
-                  </div>
-                  <div className="card">
-                    <h3>Total Tours</h3>
-                    <p className="meta">{totalTours.toLocaleString()} published tours</p>
-                    <div className="submarine-chart__meter" aria-hidden>
-                      <span style={{ width: kpiPct(totalTours) }} />
-                    </div>
-                  </div>
-                  <div className="card">
-                    <h3>Shot O&apos;Clock Events</h3>
-                    <p className="meta">{shotOClockEvents.toLocaleString()} total transmissions</p>
-                    <div className="submarine-chart__meter" aria-hidden>
-                      <span style={{ width: kpiPct(shotOClockEvents) }} />
-                    </div>
-                  </div>
-                </div>
-              </RetroWindow>
-
-              <RetroWindow title="Travel Queue">
+              <RetroWindow title="Tour Queue">
                 <div className="card-list">
                   {recentTrips.map((trip) => (
                     <div key={trip.id} className="card">
+                      {recentTripCoverById.get(trip.id) ? (
+                        <img
+                          src={recentTripCoverById.get(trip.id)}
+                          alt={`${trip.title} cover`}
+                          className="trip-preview-cover"
+                          loading="lazy"
+                          decoding="async"
+                          width={640}
+                          height={360}
+                        />
+                      ) : null}
                       <h3>{trip.title}</h3>
                       <p className="meta">{trip.location}</p>
                       <p>{trip.summary}</p>
-                      <Link href={`/trips/${trip.slug}`}>View Trip Log</Link>
+                      <Link href={`/tours/${trip.slug}`} className="neon-button card-cta-button">
+                        Open Tour
+                      </Link>
                     </div>
                   ))}
                 </div>
@@ -580,7 +719,9 @@ export default async function HomePage() {
                       <h3>{post.title}</h3>
                       <p className="meta">/{post.category.toLowerCase()}</p>
                       <p>{post.excerpt ?? "No excerpt yet."}</p>
-                      <Link href={`/blog/${post.slug}`}>Open Post</Link>
+                      <Link href={`/blog/${post.slug}`} className="neon-button card-cta-button">
+                        Open Post
+                      </Link>
                     </div>
                   ))}
                 </div>
@@ -590,21 +731,70 @@ export default async function HomePage() {
             <HomeChartsColumn
               btcInitial={{ points: btcWeekly.points, source: btcWeekly.source }}
               ethInitial={{ points: ethWeekly.points, source: ethWeekly.source }}
+              stats={{
+                totalMembers,
+                totalTours,
+                shotOClockEvents
+              }}
             />
           </div>
         </div>
 
         <aside className="home-chat-dock">
           <ChatAutoRefresh intervalMs={5000} />
-          <RetroWindow title="Chat Transmission" className="home-chat-window">
-            <p className="meta">Synced with the Live Chat page. Realtime-ish refresh every 5 seconds.</p>
+          <RetroWindow
+            title="Chat Transmission"
+            className={`home-chat-window ${communicatorActive ? "home-chat-window--active" : "home-chat-window--dormant"}`}
+          >
+            <div className="chat-comm-header" aria-live="polite">
+              <div className="chat-comm-header__cluster chat-comm-header__cluster--left">
+                <span className="chat-comm-header__led chat-comm-header__led--teal" aria-hidden />
+                <span className="chat-comm-header__led chat-comm-header__led--amber" aria-hidden />
+                <span className="chat-comm-header__mark">MX-9 LINK</span>
+              </div>
+              <div className="chat-comm-header__cluster chat-comm-header__cluster--center">
+                <span className="chat-comm-header__signal-label">signal</span>
+                <span className="chat-comm-header__bars" aria-hidden>
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              </div>
+              <div className="chat-comm-header__cluster chat-comm-header__cluster--right">
+                <span className="chat-comm-header__state">{communicatorStateTone}</span>
+                <span className="chat-comm-header__mark">
+                  {latestTransmissionAt ? `last packet ${latestTransmissionAt.toLocaleTimeString()}` : "no packets in range"}
+                </span>
+              </div>
+            </div>
+            <p className="meta chat-comm-meta">Synced with Live Chat // auto-refresh every 5 seconds.</p>
             <ChatThreadViewport className="chat-thread home-chat-thread">
               {chatEntries.map((entry) => (
                 <article
                   key={entry.id}
-                  className={`chat-message ${entry.userId === user.id ? "chat-message--outbound" : "chat-message--inbound"} ${entry.satoshiDrop ? "chat-message--satoshi" : ""} ${entry.ethDrop ? "chat-message--ethereum" : ""}`}
+                  className={`chat-message ${entry.userId === user.id ? "chat-message--outbound" : "chat-message--inbound"} ${entry.satoshiDrop ? "chat-message--satoshi" : ""} ${entry.ethDrop ? "chat-message--ethereum" : ""} ${entry.parsedMessage.kind === "meme" ? "chat-message--meme" : ""}`}
                 >
-                  <p className="chat-message__body">{entry.message}</p>
+                  {entry.parsedMessage.kind === "meme" ? (
+                    <div className="chat-message__meme">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={entry.parsedMessage.payload.previewUrl}
+                        alt={entry.parsedMessage.payload.caption || `Meme uploaded by @${entry.parsedMessage.payload.uploader}`}
+                        className="chat-message__meme-image"
+                        loading="lazy"
+                        decoding="async"
+                        width={420}
+                        height={420}
+                      />
+                      {entry.parsedMessage.payload.caption ? (
+                        <p className="chat-message__meme-caption">{entry.parsedMessage.payload.caption}</p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="chat-message__body">{entry.parsedMessage.text}</p>
+                  )}
                   {entry.satoshiDrop ? (
                     <div className="chat-sats-row">
                       <p className="meta">
@@ -700,7 +890,7 @@ export default async function HomePage() {
                     </div>
                   ) : null}
                   <p className="meta">
-                    {entry.user.displayName} (<ProfileLink username={entry.user.username} />) :: {entry.createdAt.toLocaleString()}
+                    <ProfileLink username={entry.user.username} /> :: {entry.createdAt.toLocaleString()}
                   </p>
                 </article>
               ))}
